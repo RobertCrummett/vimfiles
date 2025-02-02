@@ -6,8 +6,6 @@ syntax on
 set modelines=0
 set t_Co=256
 set background=dark
-let g:accent_color = 'cyan'
-colorscheme accent
 " noremap <silent> <F2> :let &cc = &cc == '' ? join(range(81,256),",") : '' <CR>
 set showcmd
 set ttyfast
