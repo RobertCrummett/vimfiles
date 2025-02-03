@@ -1,15 +1,14 @@
 set nocompatible
 filetype plugin on
 filetype indent on
-set encoding=utf-8
 syntax on
+set ttyfast
+set encoding=utf-8
 set modelines=0
 " set t_Co=256
 " set background=dark
 " noremap <silent> <F2> :let &cc = &cc == '' ? join(range(81,256),",") : '' <CR>
 set showcmd
-set ttyfast
-set nospell
 set spelllang=en_us
 set backspace=indent,eol,start
 set laststatus=2
@@ -73,3 +72,4 @@ if executable("rg")
 	set grepprg=rg\ --vimgrep\ --smart-case
 endif
 set omnifunc=syntaxcomplete#Complete
+set belloff=all
