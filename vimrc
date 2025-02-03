@@ -5,7 +5,7 @@ syntax on
 set ttyfast
 set encoding=utf-8
 set modelines=0
-" set t_Co=256
+set t_Co=256
 " set background=dark
 " noremap <silent> <F2> :let &cc = &cc == '' ? join(range(81,256),",") : '' <CR>
 set showcmd
