@@ -1,10 +1,10 @@
 set nocompatible
 set t_Co=256
 set background=light
+set termguicolors
 filetype plugin on
 filetype indent on
 syntax on
-colorscheme zellner
 " noremap <silent> <F2> :let &cc = &cc == '' ? join(range(81,256),",") : '' <CR>
 set showcmd
 set spelllang=en_us
