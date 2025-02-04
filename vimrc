@@ -1,12 +1,10 @@
 set nocompatible
+set t_Co=256
+set background=light
 filetype plugin on
 filetype indent on
 syntax on
-set ttyfast
-set encoding=utf-8
-set modelines=0
-set t_Co=256
-" set background=dark
+colorscheme zellner
 " noremap <silent> <F2> :let &cc = &cc == '' ? join(range(81,256),",") : '' <CR>
 set showcmd
 set spelllang=en_us
@@ -26,7 +24,7 @@ set statusline=%F
 " noremap <Down> <Nop>
 " noremap <Right> <Nop>
 " noremap <Left> <Nop>
-set listchars=tab:\ \ ,nbsp:+,space:·,trail:.
+" set listchars=tab:\ \ ,nbsp:+,space:·,trail:.
 " let t:is_transparent = 0
 " function! ToggleTransparent()
 " 	if t:is_transparent == 0
@@ -43,22 +41,22 @@ set listchars=tab:\ \ ,nbsp:+,space:·,trail:.
 set tabstop=4
 set softtabstop=4
 set shiftwidth=4
-set autoindent
-set copyindent
+" set autoindent
+" set copyindent
 set expandtab
-set noshiftround
 set scrolloff=5
 set incsearch
 set wildmenu
-set ignorecase
-set nohlsearch
-set showmatch
-set smartcase
 set mouse=
 set path+=**
+augroup vimrc-incsearch-highlight
+    autocmd!
+    autocmd CmdlineEnter /,\? :set hlsearch
+    autocmd CmdlineLeave /,\? :set nohlsearch
+augroup END
 let &wildignore = join(map(split(substitute(substitute(
-	\ netrw_gitignore#Hide(), '\.\*', '*', 'g'), '\\.', '.', 'g'), ','),
-	\ "v:val.','.v:val.'/'"), ',')
+            \ netrw_gitignore#Hide(), '\.\*', '*', 'g'), '\\.', '.', 'g'), ','),
+            \ "v:val.','.v:val.'/'"), ',')
 set wildignore+=**/venv/**
 set wildignore+=**/__pycache__/**
 set wildignore+=**/node_modules/**
@@ -69,7 +67,7 @@ let g:netrw_liststyle = 1
 let g:netrw_sizestyle='h'
 let g:netrw_list_hide= netrw_gitignore#Hide() .. '.*\.swp$'
 if executable("rg")
-	set grepprg=rg\ --vimgrep\ --smart-case
+    set grepprg=rg\ --vimgrep\ --smart-case
 endif
 set omnifunc=syntaxcomplete#Complete
 set belloff=all
