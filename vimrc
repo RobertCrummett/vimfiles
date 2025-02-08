@@ -2,6 +2,7 @@ set nocompatible
 set t_Co=256
 set background=light
 set termguicolors
+filetype on
 filetype plugin on
 filetype indent on
 syntax on
@@ -20,10 +21,6 @@ set statusline=%F
 " 		execute 'let &ro = &ro'
 " 	endfunction
 " endif
-" noremap <Up> <Nop>
-" noremap <Down> <Nop>
-" noremap <Right> <Nop>
-" noremap <Left> <Nop>
 " set listchars=tab:\ \ ,nbsp:+,space:·,trail:.
 " let t:is_transparent = 0
 " function! ToggleTransparent()
@@ -57,9 +54,7 @@ augroup END
 let &wildignore = join(map(split(substitute(substitute(
             \ netrw_gitignore#Hide(), '\.\*', '*', 'g'), '\\.', '.', 'g'), ','),
             \ "v:val.','.v:val.'/'"), ',')
-set wildignore+=**/venv/**
-set wildignore+=**/__pycache__/**
-set wildignore+=**/node_modules/**
+set wildignore+=**/venv/**,**/__pycache__/**,**/node_modules/**
 let g:netrw_keepdir = 0
 let g:netrw_banner = 0
 let g:netrw_localcopydircmd = 'cp -r'
@@ -71,3 +66,9 @@ if executable("rg")
 endif
 set omnifunc=syntaxcomplete#Complete
 set belloff=all
+noremap <Up> <Nop>
+noremap <Down> <Nop>
+noremap <Right> <Nop>
+noremap <Left> <Nop>
+colorscheme lunaperche
+" set clipboard+=unnamedplus
