@@ -74,4 +74,5 @@ colorscheme lunaperche
 if executable('fzf')
 	set rtp+=/opt/homebrew/opt/fzf
 endif
+set modelines=0
 " set clipboard+=unnamedplus
