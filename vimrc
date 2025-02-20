@@ -71,4 +71,7 @@ noremap <Down> <Nop>
 noremap <Right> <Nop>
 noremap <Left> <Nop>
 colorscheme lunaperche
+if executable('fzf')
+	set rtp+=/opt/homebrew/opt/fzf
+endif
 " set clipboard+=unnamedplus
