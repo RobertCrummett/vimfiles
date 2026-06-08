@@ -1,14 +1,6 @@
-" Notice space is input between the expressions of echo
-echo "the value of 'shell' is" &shell "\n"
+" Another way to send info back to the user,
+" this time without a 'Hit enter' prompt
 
-" Nothing (n) is added!
-echon "the value of 'shell' is " &shell "\n"
-
-" Highlighting
-echoh WarningMsg | echo "Don't panic\n" | echoh None
-
-" Persistant messages can be viewed from :messages
-echom "Nothing is wrong"
-
-" A friendly ascii art cat
-echo ">^.^<"
+if has('popupwin')
+	echow "This is a non-blocking message! (duration: 3 seconds)"
+endif
