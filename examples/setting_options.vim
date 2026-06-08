@@ -1,4 +1,5 @@
-" Not all options are boolean. Some take values. For instance,
+" Not all options are boolean. Some take 
+" values. For instance,
 set number
 set numberwidth=10
 " The first option is boolean. The second
@@ -20,4 +21,4 @@ set number relativenumber numberwidth=4
 
 
 " References
-" learnvimscriptthehardway
+" https://learnvimscriptthehardway.stevelosh.com/chapters/02.html
