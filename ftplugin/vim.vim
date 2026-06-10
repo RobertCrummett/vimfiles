@@ -3,6 +3,6 @@ if exists("b:did_ftplugin")
 endif
 let b:did_ftplugin = 1
 
-compiler racket
-
-setlocal lisp
+setlocal smartindent
+setlocal shiftwidth=2
+setlocal softtabstop=2
