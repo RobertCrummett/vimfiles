@@ -9,9 +9,6 @@ if has('termguicolors')
   set termguicolors
 endif
 
-set shiftwidth=4
-set softtabstop=-1
-
 augroup morning_colorscheme
   au!
   au Colorscheme morning highlight Constant 
@@ -26,3 +23,4 @@ let g:loaded_netrw       = 1
 let g:loaded_netrwPlugin = 1
 
 packadd! matchit
+packadd! comment
