@@ -7,7 +7,6 @@ compiler racket
 
 setlocal autoindent
 setlocal lisp
-setlocal lispwords=define,if,cond,else,and,or,let,begin,lambda,mu,quote,delay,cons-stream,set!,quasiquote,unquote,unquote-splicing,define-macro
 
 " Removes two characters.
 " First character is at the initial position.

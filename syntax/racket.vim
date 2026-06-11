@@ -5,11 +5,13 @@ function! s:ToggleSICPSyntax() abort
   " Applies syntax highlighting specific to MIT Scheme used in SICP.
   let l:is_sicp = (getline(1) =~# '^#lang sicp$')
   if l:is_sicp
-    syntax keyword SICPFunc cons-stream containedin=ALLBUT,racketComment
-    syntax keyword SICPFunc stream-null? containedin=ALLBUT,racketComment
-    highlight default link SICPFunc racketFunc
+    syntax keyword SICPBuiltin 
+      \ nil inc dec the-empty-stream cons-stream stream-null?
+      \ runtime random amb true false identity error
+      \ containedin=ALLBUT,racketComment
+    highlight default link SICPBuiltin racketFunc
   else
-    silent! syntax clear SICPFunc
+    silent! syntax clear SICPBuiltin
   endif
 endfunction
 
