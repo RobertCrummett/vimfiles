@@ -1,24 +1,33 @@
+if exists('g:plugin_comments')
+  finish
+endif
+let g:plugin_comments = v:true
+
 " Comments placed into this map should be unescaped string literals.
-let s:comment_map = {
+let g:comment_map = {
   \ "c": '//',
   \ "cpp": '//',
-  \ "racket": ';;',
+  \ "racket": ';;;',
+  \ "scheme": ';;;',
   \ "tex": '%',
   \ "typst": '//',
   \ "vim": '"',
   \ }
 
 function! s:ProcessCommentRange(start_line, end_line) abort
-  if !has_key(s:comment_map, &filetype)
+  if !has_key(g:comment_map, &filetype)
     echohl WarningMSG
-    echom "No comment leader for filetype `" . &filetype . "` in comment_map"
-    echom "Suggestion: add `" . &filetype . "` to the comment_map"
-    echo  "No comment leader for filetype `" . &filetype . "` in comment_map"
+    echom "No comment leader for filetype `" . 
+      \ &filetype . "` in comment_map"
+    echom "Suggestion: add `" . &filetype . 
+      \ "` to the comment_map"
+    echo  "No comment leader for filetype `" . 
+      \ &filetype . "` in comment_map"
     echohl None
     return
   endif
 
-  let l:leader = s:comment_map[&filetype]
+  let l:leader = g:comment_map[&filetype]
   let l:escaped_leader = escape(l:leader, '\*^$.~[]/')
 
   " The first line of the target range determines the toggle state
@@ -38,10 +47,12 @@ function! s:ProcessCommentRange(start_line, end_line) abort
 
     " Toggle comments on/off
     if l:is_commented
-      execute 'silent! ' . lnum . 's/^\(\s*\)' . l:escaped_leader . ' \?/\1/'
+      execute 'silent! ' . lnum . 's/^\(\s*\)' . 
+        \ l:escaped_leader . ' \?/\1/'
     else
       let l:repl_leader = escape(l:leader, '/\&')
-      execute 'silent! ' . lnum . 's/^\(\s*\)/\1' . l:repl_leader . ' /'
+      execute 'silent! ' . lnum . 's/^\(\s*\)/\1' . 
+        \ l:repl_leader . ' /'
     endif
   endfor
 

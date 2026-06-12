@@ -3,10 +3,10 @@ if exists("b:did_ftplugin")
 endif
 let b:did_ftplugin = 1
 
-compiler racket
-
 setlocal autoindent
 setlocal lisp
+
+setlocal syntax=racket
 
 inoremap <buffer> ( ()<esc>i
 inoremap <buffer> ) ()<esc>i
