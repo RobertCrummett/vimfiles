@@ -7,6 +7,7 @@ compiler racket
 
 setlocal autoindent
 setlocal lisp
+setlocal lispwords+=cond
 
 inoremap <buffer> ( ()<esc>i
 inoremap <buffer> ) ()<esc>i
