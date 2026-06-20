@@ -9,6 +9,7 @@ let g:comment_map = {
   \ "cpp": '//',
   \ "racket": ';;;',
   \ "scheme": ';;;',
+  \ "sh": '#',
   \ "tex": '%',
   \ "typst": '//',
   \ "vim": '"',
