@@ -9,8 +9,7 @@ if has('termguicolors')
   set termguicolors
 endif
 
-set ttimeout
-set ttimeoutlen=100
+set ttimeout ttimeoutlen=100
 
 augroup morning_colorscheme
   au!
@@ -18,23 +17,21 @@ augroup morning_colorscheme
    \ ctermfg=201 ctermbg=NONE guifg=#ff00ff guibg=NONE
 augroup END
 
-set autoindent
-set smarttab
-set incsearch
-set hlsearch
+set autoindent smarttab
+set incsearch hlsearch
 
 " CTRL-L clears highlight of hlsearch
 if maparg('<C-L>', 'n') ==# ''
   nnoremap <silent> <C-L> :nohlsearch<C-R>=has('diff')?'<Bar>diffupdate':''<CR><CR><C-L>
 endif
 
-set display+=truncate
-set formatoptions+=j
+set formatoptions+=jro/ncq
+set formatoptions-=t
+set textwidth=80
 set autoread
 
 set viminfo^=!
-set sessionoptions-=options
-set viewoptions-=options
+set sessionoptions-=options viewoptions-=options
 
 if empty(mapcheck('<C-U>', 'i'))
   inoremap <C-U> <C-G>u<C-U>
@@ -45,8 +42,8 @@ if empty(mapcheck('<C-W>', 'i'))
 endif
 
 " This disables netrw
-let g:loaded_netrw       = 1
-let g:loaded_netrwPlugin = 1
+let g:loaded_netrw=1
+let g:loaded_netrwPlugin=1
 
 " Remove included files from the search list
 " to speed up insert mode completion problems.
@@ -64,8 +61,7 @@ let g:loaded_netrwPlugin = 1
 " NOTE: This behavior does not occur on posix.
 " As expected, repeated presses of i_CTRL-X_CTRL-L
 " bring in lines below matching line.
-set complete-=i
-set foldmethod=manual
+set complete-=i foldmethod=manual
 
 " Faster grepping
 if executable('rg')
@@ -73,8 +69,7 @@ if executable('rg')
   set grepformat+=%f:%l:%c:%m
 endif
 
-" Open web links with lynx when it is available
-" on everything except Windows
+" Open web links with lynx when it is available on everything except Windows
 if executable('lynx') && !has('win32')
   let g:Openprg='lynx'
   nnoremap gx :execute '!lynx ' . shellescape(substitute(expand("<cfile>", 1), '#', '%23', 'g'))<CR><CR>
