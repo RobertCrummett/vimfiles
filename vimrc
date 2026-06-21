@@ -5,9 +5,6 @@ if has('syntax') && !exists('g:syntax_on')
 endif
 filetype plugin indent on
 
-colorscheme quiet
-set background=dark
-
 if has('termguicolors')
   set termguicolors
 endif
@@ -26,7 +23,7 @@ set smarttab
 set incsearch
 set hlsearch
 
-" CTRL-L Clears highlight of hlsearch
+" CTRL-L clears highlight of hlsearch
 if maparg('<C-L>', 'n') ==# ''
   nnoremap <silent> <C-L> :nohlsearch<C-R>=has('diff')?'<Bar>diffupdate':''<CR><CR><C-L>
 endif
