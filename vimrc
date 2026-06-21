@@ -11,26 +11,34 @@ if has('termguicolors')
   set termguicolors
 endif
 
-set ttimeout ttimeoutlen=100
+set timeout timeoutlen=3000 ttimeoutlen=100
 
-" Why does this colorscheme have a white background behind constants by default?
-augroup morning_colorscheme
+augroup colorscheme_modifications
   au!
+  " colorscheme morning
   au Colorscheme morning highlight Constant ctermfg=201 ctermbg=NONE guifg=#ff00ff guibg=NONE
+
+  " colorscheme evening
+  au Colorscheme evening highlight Normal ctermbg=0 guibg=#000000
+  au Colorscheme evening highlight EndOfBuffer ctermfg=153 ctermbg=0 guifg=#add8e6 guibg=#000000
 augroup END
 
-set autoindent smarttab incsearch hlsearch
-
-" CTRL-L clears highlight of hlsearch
+if has('extra_search')
+  set hlsearch incsearch
+endif
 if maparg('<C-L>', 'n') ==# ''
   nnoremap <silent> <C-L> :noh<C-R>=has('diff')?'<Bar>dif':''<CR><CR><C-L>
 endif
 
-set formatoptions+=jr/ncq fo-=to textwidth=80
+set autoindent smarttab
+set formatoptions+=jr/ncq fo-=to textwidth=80 nojoinspaces
+nnoremap Q gq
 
 set autoread
 set viminfo^=!
-set sessionoptions-=options viewoptions-=options
+if has('mksession')
+  set sessionoptions-=options viewoptions-=options
+endif
 
 if empty(mapcheck('<C-U>', 'i'))
   inoremap <C-U> <C-G>u<C-U>
@@ -44,31 +52,24 @@ endif
 let g:loaded_netrw=1
 let g:loaded_netrwPlugin=1
 
-" Remove included files from the search list
-" to speed up insert mode completion problems.
+" Remove included files from the search list to speed up insert mode completion
+" problems.
 "
-" BUG: I still get infinite 'Scanning: <path>'
-" on repeated i_CTRL-X_CTRL-L presses while
-" holding down CTRL key. There is only one other
-" person online who seems to have encountered
-" this bug, but there was no progress in solving
-" it so far as I can tell. Upon grepping vim
-" source, I can find the location of the 'Scanning: '
-" message. However, it led me no closer to figuring
-" out this issue.
+" BUG: I still get infinite 'Scanning: <path>' on repeated i_CTRL-X_CTRL-L
+" presses while holding down CTRL key. There is only one other person online who
+" seems to have encountered this bug, but there was no progress in solving it so
+" far as I can tell. Upon grepping vim source, I can find the location of the
+" 'Scanning: ' message. However, it led me no closer to figuring out this issue.
 "
-" NOTE: This behavior does not occur on posix.
-" As expected, repeated presses of i_CTRL-X_CTRL-L
-" bring in lines below matching line.
+" NOTE: This behavior does not occur on posix systems. As expected, repeated
+" presses of i_CTRL-X_CTRL-L bring in lines below matching line.
 set complete-=i foldmethod=manual
 
-" Faster grepping
 if executable('rg')
   set grepprg=rg\ --vimgrep\ -uu
   set grepformat+=%f:%l:%c:%m
 endif
 
-" Open web links with lynx when it is available on everything except Windows
 if executable('lynx') && !has('win32')
   let g:Openprg='lynx'
   nnoremap gx :execute '!lynx ' . shellescape(substitute(expand("<cfile>", 1), '#', '%23', 'g'))<CR><CR>

@@ -7,3 +7,6 @@ setlocal shiftwidth=2
 setlocal softtabstop=2
 
 setlocal comments+=:\"
+setlocal formatoptions-=t
+
+setlocal keywordprg=:help
