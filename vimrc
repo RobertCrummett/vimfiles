@@ -1,4 +1,6 @@
-set nocompatible
+if &compatible
+  set nocompatible
+endif
 
 if has('syntax') && !exists('g:syntax_on')
   syntax on
@@ -11,25 +13,22 @@ endif
 
 set ttimeout ttimeoutlen=100
 
+" Why does this colorscheme have a white background behind constants by default?
 augroup morning_colorscheme
   au!
-  au Colorscheme morning highlight Constant 
-   \ ctermfg=201 ctermbg=NONE guifg=#ff00ff guibg=NONE
+  au Colorscheme morning highlight Constant ctermfg=201 ctermbg=NONE guifg=#ff00ff guibg=NONE
 augroup END
 
-set autoindent smarttab
-set incsearch hlsearch
+set autoindent smarttab incsearch hlsearch
 
 " CTRL-L clears highlight of hlsearch
 if maparg('<C-L>', 'n') ==# ''
-  nnoremap <silent> <C-L> :nohlsearch<C-R>=has('diff')?'<Bar>diffupdate':''<CR><CR><C-L>
+  nnoremap <silent> <C-L> :noh<C-R>=has('diff')?'<Bar>dif':''<CR><CR><C-L>
 endif
 
-set formatoptions+=jro/ncq
-set formatoptions-=t
-set textwidth=80
-set autoread
+set formatoptions+=jr/ncq fo-=to textwidth=80
 
+set autoread
 set viminfo^=!
 set sessionoptions-=options viewoptions-=options
 
@@ -78,7 +77,7 @@ endif
 set nrformats-=octal
 
 if exists(":DiffOrig") != 2
-  command DiffOrig vert new | set bt=nofile | r ++edit # | 0d_ | diffthis | wincmd p | diffthis
+  com DiffOrig vert new | set bt=nofile | r ++edit # | 0d_ | difft | wincmd p | difft
 endif
 
 " From tpope/vim-sensible. Highlights $() in sh filetype.
