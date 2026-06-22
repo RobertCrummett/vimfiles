@@ -7,6 +7,12 @@ if has('syntax') && !exists('g:syntax_on')
 endif
 filetype plugin indent on
 
+set nowrap sidescroll=5
+set belloff=all
+
+set wildignore+=*.pdf,*.o,.git/**
+set wildignore+=*.obj,*.pdb,*.ilk,*.exe
+
 if has('termguicolors')
   set termguicolors
 endif
@@ -66,22 +72,16 @@ let g:loaded_netrwPlugin=1
 set complete-=i foldmethod=manual
 
 if executable('rg')
-  set grepprg=rg\ --vimgrep\ -uu
-  set grepformat+=%f:%l:%c:%m
+  set grepformat+=%f:%l:%c:%m grepprg=rg\ --vimgrep\ -uu
 endif
 
 if executable('lynx') && !has('win32')
   let g:Openprg='lynx'
-  nnoremap gx :execute '!lynx ' . shellescape(substitute(expand("<cfile>", 1), '#', '%23', 'g'))<CR><CR>
+  nn gx :exe '!lynx ' . shellescape(substitute(expand("<cfile>", 1), '#', '%23', 'g'))<CR><CR>
 endif
 
 set nrformats-=octal
 
 if exists(":DiffOrig") != 2
   com DiffOrig vert new | set bt=nofile | r ++edit # | 0d_ | difft | wincmd p | difft
-endif
-
-" From tpope/vim-sensible. Highlights $() in sh filetype.
-if !exists('g:is_posix') && !exists('g:is_bash') && !exists('g:is_kornshell') && !exists('g:is_dash')
-  let g:is_posix = 1
 endif
