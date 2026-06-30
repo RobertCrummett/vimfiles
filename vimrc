@@ -8,10 +8,20 @@ endif
 filetype plugin indent on
 
 set nowrap sidescroll=5
+
+set noerrorbells
+set novisualbell
+set t_vb=
 set belloff=all
 
-set wildignore+=*.pdf,*.o,.git/**
+set wildmenu
+set wildignore+=*.pdf,*.o
 set wildignore+=*.obj,*.pdb,*.ilk,*.exe
+set wildignore+=*/.git/*,*/.DS_Store
+
+set backspace=eol,start,indent
+
+set lazyredraw
 
 if has('termguicolors')
   set termguicolors
@@ -36,11 +46,16 @@ if maparg('<C-L>', 'n') ==# ''
   nnoremap <silent> <C-L> :noh<C-R>=has('diff')?'<Bar>dif':''<CR><CR><C-L>
 endif
 
-set autoindent smarttab
+set autoindent smarttab expandtab
 set formatoptions+=jr/ncq fo-=to textwidth=80 nojoinspaces
 nnoremap Q gq
 
 set autoread
+augroup updates
+  au!
+  au FocusGained,BufEnter * silent! checktime
+augroup END
+
 set viminfo^=!
 if has('mksession')
   set sessionoptions-=options viewoptions-=options
@@ -61,11 +76,12 @@ let g:loaded_netrwPlugin=1
 " Remove included files from the search list to speed up insert mode completion
 " problems.
 "
-" BUG: I still get infinite 'Scanning: <path>' on repeated i_CTRL-X_CTRL-L
-" presses while holding down CTRL key. There is only one other person online who
-" seems to have encountered this bug, but there was no progress in solving it so
-" far as I can tell. Upon grepping vim source, I can find the location of the
-" 'Scanning: ' message. However, it led me no closer to figuring out this issue.
+" BUG: Hangs, sometimes with 'Scanning: <path>' message displayed on repeated
+" i_CTRL-X_CTRL-L presses while holding down CTRL key on Win32. There is only
+" one other person online who seems to have encountered this bug, but there was
+" no progress in solving it so far as I can tell. Upon grepping vim source, I
+" can find the location of the 'Scanning: ' message. However, it led me no
+" closer to figuring out this issue.
 "
 " NOTE: This behavior does not occur on posix systems. As expected, repeated
 " presses of i_CTRL-X_CTRL-L bring in lines below matching line.
@@ -82,6 +98,36 @@ endif
 
 set nrformats-=octal
 
+set nobackup
+set noswapfile
+
 if exists(":DiffOrig") != 2
   com DiffOrig vert new | set bt=nofile | r ++edit # | 0d_ | difft | wincmd p | difft
 endif
+
+if has("gui_running")
+  set guioptions-=T go-=e go-=m go-=r go-=R go-=l go-=L
+  set t_Co=256
+endif
+
+" Search for text in visual mode.
+vnoremap <silent> * :<C-u>call <SID>VSetSearch()<CR>/<C-R>=@/<CR><CR>
+vnoremap <silent> # :<C-u>call <SID>VSetSearch()<CR>?<C-R>=@/<CR><CR>
+
+function! s:VSetSearch()
+  let l:saved_reg = @s
+  normal! gv"sy
+  let @/ = '\V' . substitute(escape(@s, '/\'), '\n', '\\n', 'g')
+  let @s = l:saved_reg
+endfunction
+
+augroup restart_editing_in_context
+  autocmd!
+  au BufReadPost * if line("'\"") > 1 && line("'\"") <= line("$") | exe "normal! g'\"" | endif
+augroup END
+
+" Move lines. Stole from https://github.com/amix/vimrc/blob/master/vimrcs/basic.vim
+nnoremap <M-j> mz:m+<cr>`z
+nnoremap <M-k> mz:m-2<cr>`z
+vnoremap <M-j> :m'>+<cr>`<my`>mzgv`yo`z
+vnoremap <M-k> :m'<-2<cr>`>my`<mzgv`yo`z
