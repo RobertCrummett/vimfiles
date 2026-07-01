@@ -92,14 +92,13 @@ if executable('rg')
 endif
 
 if executable('lynx') && !has('win32')
-  let g:Openprg='lynx'
+  let g:Openprg='lynx' " Openprg is not working as I expect. Not sure why.
   nn gx :exe '!lynx ' . shellescape(substitute(expand("<cfile>", 1), '#', '%23', 'g'))<CR><CR>
 endif
 
 set nrformats-=octal
 
-set nobackup
-set noswapfile
+set nobackup noswapfile
 
 if exists(":DiffOrig") != 2
   com DiffOrig vert new | set bt=nofile | r ++edit # | 0d_ | difft | wincmd p | difft
@@ -108,9 +107,21 @@ endif
 if has("gui_running")
   set guioptions-=T go-=e go-=m go-=r go-=R go-=l go-=L
   set t_Co=256
+  if has("gui_win32")
+    set guifont=Consolas:h15
+
+    function! s:ChangeFontSize(inc) abort
+      let l:font_size = matchstr(&guifont, '\(:h\)\@<=\d\+$')
+      let l:new_font_size = ':h' . (l:font_size + a:inc)
+      let &guifont = substitute(&guifont, ':h\d\+$', l:new_font_size, '')
+    endfunction
+
+    nnoremap <C-ScrollWheelUp>   :call <SID>ChangeFontSize(+1)<CR>
+    nnoremap <C-ScrollWheelDown> :call <SID>ChangeFontSize(-1)<CR>
+  endif
 endif
 
-" Search for text in visual mode.
+" Search for text highlighted in visual mode.
 vnoremap <silent> * :<C-u>call <SID>VSetSearch()<CR>/<C-R>=@/<CR><CR>
 vnoremap <silent> # :<C-u>call <SID>VSetSearch()<CR>?<C-R>=@/<CR><CR>
 
