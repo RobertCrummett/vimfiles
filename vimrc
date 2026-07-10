@@ -21,8 +21,6 @@ set wildignore+=*/.git/*,*/.DS_Store
 
 set backspace=eol,start,indent
 
-set lazyredraw
-
 if has('termguicolors')
   set termguicolors
 endif
@@ -144,3 +142,8 @@ nnoremap <C-j> mz:m+<CR>`z
 nnoremap <C-k> mz:m-2<CR>`z
 vnoremap <C-j> :m'>+<CR>`<my`>mzgv`yo`z
 vnoremap <C-k> :m'<-2<CR>`>my`<mzgv`yo`z
+
+" vim-sexp specific settings.
+if !exists('g:sexp_loaded')
+  let g:sexp_filetypes = 'clojure,scheme,lisp,timl,fennel,racket'
+endif

@@ -5,7 +5,6 @@ let b:did_ftplugin = 1
 
 compiler racket
 
-setlocal autoindent
 setlocal lisp
 setlocal lispwords+=cond
 setlocal syntax=racket
