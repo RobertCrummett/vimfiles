@@ -138,7 +138,9 @@ augroup restart_editing_in_context
 augroup END
 
 " Move lines. Stole from https://github.com/amix/vimrc/blob/master/vimrcs/basic.vim
-nnoremap <M-j> mz:m+<cr>`z
-nnoremap <M-k> mz:m-2<cr>`z
-vnoremap <M-j> :m'>+<cr>`<my`>mzgv`yo`z
-vnoremap <M-k> :m'<-2<cr>`>my`<mzgv`yo`z
+"
+" These overwrite CTRL-K, which is by default the enter digraph command.
+nnoremap <C-j> mz:m+<CR>`z
+nnoremap <C-k> mz:m-2<CR>`z
+vnoremap <C-j> :m'>+<CR>`<my`>mzgv`yo`z
+vnoremap <C-k> :m'<-2<CR>`>my`<mzgv`yo`z
