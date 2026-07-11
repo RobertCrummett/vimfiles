@@ -1,4 +1,4 @@
-" NOTE: Commented out because I am not sure that these should be
+" XXX Commented out because I am not sure that these should be
 " highlighted if by default they are not. I should just go with
 " the defaults probably. But leaving this here incase it looks bad.
 "

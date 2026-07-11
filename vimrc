@@ -27,15 +27,30 @@ endif
 
 set timeout timeoutlen=3000 ttimeoutlen=100
 
+colorscheme quiet
+
 augroup colorscheme_modifications
   au!
-  " colorscheme morning
+  " color scheme morning
   au Colorscheme morning highlight Constant ctermfg=201 ctermbg=NONE guifg=#ff00ff guibg=NONE
 
-  " colorscheme evening
+  " color scheme evening
   au Colorscheme evening highlight Normal ctermbg=0 guibg=#000000
   au Colorscheme evening highlight EndOfBuffer ctermfg=153 ctermbg=0 guifg=#add8e6 guibg=#000000
+
+  " color scheme quiet
+  au Colorscheme quiet setlocal spell spl=en_us
+  au Colorscheme quiet highlight SpellBad  ctermbg=0 guibg=#000000
+  au Colorscheme quiet highlight SpellCap  ctermbg=0 guibg=#000000
+  au Colorscheme quiet highlight SpellRare ctermbg=0 guibg=#000000
 augroup END
+
+" NOTE This check is inserted in case that someone (me) sets a color scheme
+" before the colorscheme_modifications apply. So this conditional ensures that
+" the order of calling colorscheme and defining the autocommand do not matter.
+if exists('g:colors_name')
+  execute 'colorscheme' g:colors_name
+endif
 
 if has('extra_search')
   set hlsearch incsearch
@@ -74,15 +89,18 @@ let g:loaded_netrwPlugin=1
 " Remove included files from the search list to speed up insert mode completion
 " problems.
 "
-" BUG: Hangs, sometimes with 'Scanning: <path>' message displayed on repeated
+" FIXME Hangs, sometimes with 'Scanning: <path>' message displayed on repeated
 " i_CTRL-X_CTRL-L presses while holding down CTRL key on Win32. There is only
 " one other person online who seems to have encountered this bug, but there was
 " no progress in solving it so far as I can tell. Upon grepping vim source, I
 " can find the location of the 'Scanning: ' message. However, it led me no
 " closer to figuring out this issue.
 "
-" NOTE: This behavior does not occur on posix systems. As expected, repeated
+" NOTE This behavior does not occur on posix systems. As expected, repeated
 " presses of i_CTRL-X_CTRL-L bring in lines below matching line.
+"
+" NOTE This works on Win32, in the gui editor. So it seems to be a problem with
+" vim from the terminal in Win32 only.
 set complete-=i foldmethod=manual
 
 if executable('rg')
@@ -95,7 +113,6 @@ if executable('lynx') && !has('win32')
 endif
 
 set nrformats-=octal
-
 set nobackup noswapfile
 
 if exists(":DiffOrig") != 2
@@ -135,8 +152,8 @@ augroup restart_editing_in_context
   au BufReadPost * if line("'\"") > 1 && line("'\"") <= line("$") | exe "normal! g'\"" | endif
 augroup END
 
-" Move lines. Stole from https://github.com/amix/vimrc/blob/master/vimrcs/basic.vim
-"
+" NOTE Move lines.
+" Stole from "https://github.com/amix/vimrc/blob/master/vimrcs/basic.vim"
 " These overwrite CTRL-K, which is by default the enter digraph command.
 nnoremap <C-j> mz:m+<CR>`z
 nnoremap <C-k> mz:m-2<CR>`z
@@ -147,3 +164,8 @@ vnoremap <C-k> :m'<-2<CR>`>my`<mzgv`yo`z
 if !exists('g:sexp_loaded')
   let g:sexp_filetypes = 'clojure,scheme,lisp,timl,fennel,racket'
 endif
+
+augroup custom_highlight_todo_words
+  au!
+  au Syntax * syntax keyword Todo NOTE containedin=.*Comment.*
+augroup END
