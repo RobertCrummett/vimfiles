@@ -191,3 +191,8 @@ function! SynStack()
   endif
   echo map(synstack(line('.'), col('.')), 'synIDattr(v:val, "name")')
 endfunc
+
+" function! LispColorscheme()
+"   colorscheme quiet
+"   hi! racketParen guifg=#22ddaa
+" endfunction
