@@ -38,12 +38,25 @@ augroup colorscheme_modifications
   au Colorscheme evening highlight Normal ctermbg=0 guibg=#000000
   au Colorscheme evening highlight EndOfBuffer ctermfg=153 ctermbg=0 guifg=#add8e6 guibg=#000000
 
+  " FIXME Current backgorund highlighting for Spell* does not
+  " switch when the background option is toggled.
+
   " color scheme quiet
-  au Colorscheme quiet setlocal spell spl=en_us
-  au Colorscheme quiet highlight SpellBad  ctermbg=0 guibg=#000000
-  au Colorscheme quiet highlight SpellCap  ctermbg=0 guibg=#000000
-  au Colorscheme quiet highlight SpellRare ctermbg=0 guibg=#000000
+  " au Colorscheme quiet highlight SpellBad  ctermbg=0 guibg=#000000
+  " au Colorscheme quiet highlight SpellCap  ctermbg=0 guibg=#000000
+  " au Colorscheme quiet highlight SpellRare ctermbg=0 guibg=#000000
+  " au Colorscheme quiet setlocal spell spl=en_us
 augroup END
+
+augroup clean_comments
+  autocmd!
+  autocmd ColorScheme * highlight clear Todo
+  autocmd ColorScheme * highlight link Todo Comment
+augroup END
+
+" Apply clean comments immediately (in case the colorscheme is already loaded)
+highlight clear Todo
+highlight link Todo Comment
 
 " NOTE This check is inserted in case that someone (me) sets a color scheme
 " before the colorscheme_modifications apply. So this conditional ensures that
@@ -153,7 +166,7 @@ augroup restart_editing_in_context
 augroup END
 
 " NOTE Move lines.
-" Stole from "https://github.com/amix/vimrc/blob/master/vimrcs/basic.vim"
+" Stole from https://github.com/amix/vimrc/blob/master/vimrcs/basic.vim
 " These overwrite CTRL-K, which is by default the enter digraph command.
 nnoremap <C-j> mz:m+<CR>`z
 nnoremap <C-k> mz:m-2<CR>`z
@@ -165,7 +178,16 @@ if !exists('g:sexp_loaded')
   let g:sexp_filetypes = 'clojure,scheme,lisp,timl,fennel,racket'
 endif
 
-augroup custom_highlight_todo_words
-  au!
-  au Syntax * syntax keyword Todo NOTE containedin=.*Comment.*
-augroup END
+" augroup custom_highlight_todo_words
+"   au!
+"   au Syntax * syntax keyword Todo NOTE containedin=.*Comment.*
+" augroup END
+
+let maplocalleader = "\\"
+
+function! SynStack()
+  if !exists("*synstack")
+    return
+  endif
+  echo map(synstack(line('.'), col('.')), 'synIDattr(v:val, "name")')
+endfunc
