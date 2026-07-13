@@ -7,8 +7,8 @@ let g:plugin_comments = v:true
 let g:comment_map = {
   \ "c": '//',
   \ "cpp": '//',
-  \ "racket": ';;;',
-  \ "scheme": ';;;',
+  \ "racket": ';;',
+  \ "scheme": ';;',
   \ "sh": '#',
   \ "tex": '%',
   \ "typst": '//',
@@ -29,17 +29,32 @@ function! s:ProcessCommentRange(start_line, end_line) abort
   endif
 
   let l:leader = g:comment_map[&filetype]
-  let l:escaped_leader = escape(l:leader, '\*^$.~[]/')
+  let l:leader_len = len(l:leader)
+
+  " Find first non-empty line to establish whether we are commenting
+  " or uncommenting, and the base level of indentation.
+  let l:first_lnum = a:start_line
+  while l:first_lnum <= a:end_line && getline(l:first_lnum) =~# '^\s*$'
+    let l:first_lnum += 1
+  endwhile
+
+  if l:first_lnum > a:end_line
+    return
+  endif
+
+  let l:first_line = getline(l:first_lnum)
+
+  let l:base_indent = matchstr(l:first_line, '^\s*')
+  let l:base_indent_len = len(l:base_indent)
 
   " The first line of the target range determines the toggle state
-  let l:first_line = getline(a:start_line)
-  let l:is_commented = (l:first_line =~# '^\s*' . l:escaped_leader)
+  let l:is_commented = (l:first_line =~# '^\s*\V' . escape(l:leader, '\'))
 
   let l:save_cursor = getpos('.')
 
   " Begin toggling comments line by line
-  for lnum in range(a:start_line, a:end_line)
-    let l:line = getline(lnum)
+  for l:lnum in range(l:first_lnum, a:end_line)
+    let l:line = getline(l:lnum)
 
     " Do not comment empty lines by default
     if l:line =~# '^\s*$'
@@ -48,12 +63,24 @@ function! s:ProcessCommentRange(start_line, end_line) abort
 
     " Toggle comments on/off
     if l:is_commented
-      execute 'silent! ' . lnum . 's/^\(\s*\)' . 
-        \ l:escaped_leader . ' \?/\1/'
+      let l:line_indent = matchstr(l:line, '^\s*')
+      let l:text = strpart(l:line, len(l:line_indent))
+
+      if strpart(l:text, 0, l:leader_len) ==# l:leader
+        let l:text = strpart(l:text, l:leader_len)
+        if len(l:text) > 0 && l:text[0] ==# ' '
+          let l:text = strpart(l:text, 1)
+        endif
+        call setline(l:lnum, l:line_indent . l:text)
+      endif
     else
-      let l:repl_leader = escape(l:leader, '/\&')
-      execute 'silent! ' . lnum . 's/^\(\s*\)/\1' . 
-        \ l:repl_leader . ' /'
+      if strpart(l:line, 0, l:base_indent_len) ==# l:base_indent
+        let l:new_line = l:base_indent . l:leader . ' ' . strpart(l:line, l:base_indent_len)
+      else
+        let l:line_indent = matchstr(l:line, '^\s*')
+        let l:new_line = l:line_indent . l:leader . ' ' . strpart(l:line, len(l:line_indent))
+      endif
+      call setline(l:lnum, l:new_line)
     endif
   endfor
 
@@ -68,7 +95,7 @@ endfunction
 
 function! s:VisualComment() abort
   let l:start_line = line("'<")
-  let l:end_line = line("'>'")
+  let l:end_line = line("'>")
   call s:ProcessCommentRange(l:start_line, l:end_line)
 endfunction
 
