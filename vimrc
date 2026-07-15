@@ -38,17 +38,13 @@ augroup colorscheme_modifications
   au Colorscheme evening highlight Normal ctermbg=0 guibg=#000000
   au Colorscheme evening highlight EndOfBuffer ctermfg=153 ctermbg=0 guifg=#add8e6 guibg=#000000
 
-  " FIXME Current backgorund highlighting for Spell* does not
-  " switch when the background option is toggled.
-
   " color scheme quiet
-  " au Colorscheme quiet highlight SpellBad  ctermbg=0 guibg=#000000
-  " au Colorscheme quiet highlight SpellCap  ctermbg=0 guibg=#000000
-  " au Colorscheme quiet highlight SpellRare ctermbg=0 guibg=#000000
-  " au Colorscheme quiet setlocal spell spl=en_us
+  au Colorscheme quiet highlight helpHyperTextJump guifg=#ff00af
+  au Colorscheme quiet highlight helpHyperTextEntry guifg=#aa9fff
+  au Colorscheme quiet highlight helpOption guifg=#ff9fff
 augroup END
 
-augroup clean_comments
+augroup colorscheme_comments
   autocmd!
   autocmd ColorScheme * highlight clear Todo
   autocmd ColorScheme * highlight link Todo Comment
@@ -58,9 +54,9 @@ augroup END
 highlight clear Todo
 highlight link Todo Comment
 
-" NOTE This check is inserted in case that someone (me) sets a color scheme
-" before the colorscheme_modifications apply. So this conditional ensures that
-" the order of calling colorscheme and defining the autocommand do not matter.
+" This check is inserted in case that someone (me) sets a color scheme before
+" the colorscheme_modifications apply. So this conditional ensures that the
+" order of calling colorscheme and defining the autocommand do not matter.
 if exists('g:colors_name')
   execute 'colorscheme' g:colors_name
 endif
@@ -73,7 +69,8 @@ if maparg('<C-L>', 'n') ==# ''
 endif
 
 set autoindent smarttab expandtab
-set formatoptions+=jr/ncq fo-=to textwidth=80 nojoinspaces
+" NOTE fo-=tc is for no automatic formatting. manually format with gq
+set formatoptions+=jro/nq fo-=tc textwidth=80 nojoinspaces
 nnoremap Q gq
 
 set autoread
@@ -165,9 +162,9 @@ augroup restart_editing_in_context
   au BufReadPost * if line("'\"") > 1 && line("'\"") <= line("$") | exe "normal! g'\"" | endif
 augroup END
 
-" NOTE Move lines.
+" NOTE Move lines in normal and visual mode.
 " Stole from https://github.com/amix/vimrc/blob/master/vimrcs/basic.vim
-" These overwrite CTRL-K, which is by default the enter digraph command.
+" These overwrite CTRL-K, which is by default enter digraphs.
 nnoremap <C-j> mz:m+<CR>`z
 nnoremap <C-k> mz:m-2<CR>`z
 vnoremap <C-j> :m'>+<CR>`<my`>mzgv`yo`z
