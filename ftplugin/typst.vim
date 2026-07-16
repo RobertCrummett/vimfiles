@@ -5,5 +5,4 @@ let b:did_ftplugin = 1
 
 compiler typst
 
-setlocal formatoptions+=t
 setlocal nojoinspaces
