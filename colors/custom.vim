@@ -85,6 +85,7 @@ function! s:Accents() abort
   " Scope prefixes such as a: b: g: l: s: on variables and functions.
   hi! link vimVarScope      customLightPurple
   hi! link vimFunctionScope customLightPurple
+  hi! link vimCommentTitle Comment
 
   " Rust: macro calls read like calls; lifetimes and escapes are special.
   " Doc comments (//! /// /** */) are comments, not SpecialComment.
