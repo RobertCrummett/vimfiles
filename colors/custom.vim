@@ -127,6 +127,14 @@ function! s:Accents() abort
   hi! link markdownUrl           customLightPurple
   hi! link markdownEscape        customLightPurple
 
+  " Matlab
+  hi! link matlabConditional      customLavendar
+  hi! link matlabRepeat           customLavendar
+  hi! link matlabLabel            customLavendar
+  hi! link matlabSemicolon        customLavendar
+  hi! link matlabLineContinuation customLavendar
+  hi! link matlabString           customLightPurple
+
   " Lisp
   hi! link lispFunc customLavendar
   hi! link lispKey  customLightPurple
