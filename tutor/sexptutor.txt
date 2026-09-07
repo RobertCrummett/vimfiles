@@ -1,0 +1,1088 @@
+===============================================================================
+=      W e l c o m e   t o   t h e   V I M - S E X P   T u t o r              =
+===============================================================================
+=                    Structural editing for Lisp code                         =
+===============================================================================
+
+     vim-sexp gives Vim the structural editing that Emacs users know as
+     paredit: motions and text objects that understand parentheses, and
+     commands that reshape code without ever leaving the brackets
+     unbalanced. This tutor teaches every mapping the plugin provides, from
+     the easiest to the hardest, in the same learn-by-doing style as
+     vimtutor.
+
+     It assumes you already know Vim well and have written some Lisp. It
+     does not assume you know the paredit vocabulary. Each term is defined
+     the first time it is used, and every lesson names the help tag to read
+     for the full story, for example  :help <Plug>(sexp_outer_list)
+
+     Time: about two hours for everything, in as many sittings as you like.
+     Chapters 1 to 4 are the daily essentials. Chapters 5 to 8 are worth one
+     careful read and a bookmark.
+
+     ATTENTION:
+     The lessons modify the text. Practise on a copy. The command
+     :SexpTutor opens a fresh copy for you with the right filetype, so the
+     mappings below are active. If you opened this file directly, make a
+     copy with a .scm extension and open that instead.
+
+     In this configuration LocalLeader is the backslash, so a mapping
+     written <LocalLeader>w below is typed as  \w
+
+     Meta keys are written <M-w> and typed as Alt-w. They work in gvim. In
+     a terminal they may need setup; Lesson 8.2 explains. Every Meta mapping
+     has a <Plug> name you can bind elsewhere if you prefer.
+
+     Move down with j until Lesson 1.1 fills the screen.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                       Lesson 1.1: THE VOCABULARY
+
+
+   ** Read this lesson. Everything else builds on these six words. **
+
+  A Lisp file is a tree. vim-sexp names the parts like this:
+
+     (define (square x)          ;; a comment is a leaf
+       (* x x))
+
+  atom       a bare token: define, square, x, *, 42, #t
+  string     text in double quotes, treated as one unit
+  comment    a line comment, also one unit
+  list       anything in matching brackets: ( ), [ ], or { }.
+             The docs also call a list a compound form.
+  element    one item at some level of the tree: an atom, a string, a
+             comment, or a whole list. An element includes any macro
+             characters stuck to its front, such as the quote in  'foo
+  top-level  a list whose opening bracket sits in column one
+
+  Relations you will see in the lessons:
+
+  current list      the innermost list around the cursor
+  current element   the element under the cursor. When the cursor sits on
+                    a bracket, the whole list is the current element, and
+                    the current list becomes its parent.
+  sibling           an element in the same list
+  child             an element one level down
+  head and tail     the first and last positions inside a list
+
+  paredit words, in vim-sexp terms:
+
+  wrap      put brackets around something          Lesson 3.3 and 3.4
+  splice    remove a list's own brackets           Lesson 4.1
+  raise     replace the parent with the child      Lesson 4.2
+  slurp     pull a neighbour into the list         Lesson 4.3, called capture
+  barf      push an element out of the list        Lesson 4.3, called emit
+  convolute swap a form with its parent            Lesson 7.3
+
+  Keep going. The rest is practice.
+
+  See  :help sexp-introduction  and  :help sexp-mappings
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                     Lesson 1.2: BRACKET TO BRACKET
+
+
+   ** Press ( and ) to jump between brackets. **
+
+  vim-sexp takes over ( and ). They stop being sentence motions and become
+  jumps to the previous or next bracket of any type.
+
+  1. Put the cursor on the d of define below.
+
+  2. Press ) repeatedly. Watch the cursor land on every bracket in turn,
+     opening and closing alike, then leave the form.
+
+  3. Press ( to walk back.
+
+  4. Try a count: 3) jumps three brackets ahead.
+
+     (define (compose f g)
+       (lambda (x)
+         (f (g x))))
+
+  5. With an operator these behave a little differently: d) from inside a
+     list deletes up to, not including, the closing bracket, so the form
+     stays balanced. Try d) on the x in (g x) and press u to undo.
+
+  (       previous bracket        :help <Plug>(sexp_move_to_prev_bracket)
+  )       next bracket            :help <Plug>(sexp_move_to_next_bracket)
+
+NOTE: If you miss the sentence motions, Lesson 8.1 shows how to move these
+      to g( and g) instead.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                   Lesson 1.3: SIBLING TO SIBLING
+
+
+   ** <M-w> and <M-b> move between siblings, <M-e> to their ends. **
+
+  These are w, b and e for elements. They never leave the current list,
+  which is exactly what makes them useful: they walk the arguments of a
+  call and stop at the end of it.
+
+  1. Put the cursor on the m of map below.
+
+  2. Press <M-w> a few times. The cursor visits the head of each sibling:
+     map, then the lambda list as one unit, then the quoted list as one
+     unit. It stops at the last sibling instead of wandering off.
+
+  3. Press <M-b> to walk back to map.
+
+  4. Press <M-e> to reach the end of each sibling instead of its head, and
+     g<M-e> to go to the end of the previous one.
+
+     (map (lambda (n) (* n n)) '(1 2 3))
+
+  5. Move onto the n inside (* n n) and press <M-w>. It only moves within
+     that small list, because that list is now the current one.
+
+  <M-w>   next sibling head        :help <Plug>(sexp_move_to_next_element_head)
+  <M-b>   previous sibling head    :help <Plug>(sexp_move_to_prev_element_head)
+  <M-e>   next sibling tail        :help <Plug>(sexp_move_to_next_element_tail)
+  g<M-e>  previous sibling tail    :help <Plug>(sexp_move_to_prev_element_tail)
+
+  These take counts and work with operators: d<M-w> deletes from the cursor
+  to the head of the next sibling, and 3<M-e> is inclusive of the third
+  sibling, a detail the paste operators in Chapter 6 will rely on.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                    Lesson 1.4: FORM TO FORM
+
+
+   ** [[ and ]] jump between top-level forms. **
+
+  A top-level form is a list whose opening bracket is in column one. These
+  motions treat the file as a sequence of them, the way [[ and ]] treat C
+  functions.
+
+  1. Put the cursor anywhere in the first definition below and press ]]
+     to reach the next top-level form, then [[ to come back.
+
+(define (double x)
+  (* 2 x))
+
+(define (halve x)
+  (/ x 2))
+
+(define (average a b)
+  (halve (+ a b)))
+
+  2. Try y]] with the cursor on the first define: it yanks up to the start
+     of the next form, so the whole definition and the blank line.
+
+  [[      previous top-level form   :help <Plug>(sexp_move_to_prev_top_element)
+  ]]      next top-level form       :help <Plug>(sexp_move_to_next_top_element)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                 Lesson 1.5: SELECTING A NEIGHBOUR
+
+
+   ** ]e and [e select the next or previous sibling. **
+
+  Unlike the motions so far, these always leave you with a Visual selection
+  of exactly one element. That makes them a precise target for an operator.
+
+  1. Put the cursor on pred in the if form below and press ]e. The then
+     branch is selected. Press <Esc>.
+
+  2. Back on pred, press 2]e. The else branch is selected. Press <Esc>.
+
+  3. Now the operator form. On pred, type  c]e  and type  new-then  and
+     press <Esc>. The then branch was replaced without you counting
+     characters or worrying about the brackets around it.
+
+     (if pred (then-branch a b) (else-branch c d))
+
+  4. Undo with u, then try  c2]e  to replace the else branch.
+
+  ]e      select next sibling       :help <Plug>(sexp_select_next_element)
+  [e      select previous sibling   :help <Plug>(sexp_select_prev_element)
+
+  You have finished Chapter 1. You can now move through any Lisp file
+  without counting brackets.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                    Lesson 2.1: THE CURRENT LIST
+
+
+   ** if and af select the current list, without or with its brackets. **
+
+  These are text objects, so they work after an operator or in Visual
+  mode, like iw and aw. The letter f stands for form.
+
+  1. Put the cursor on the second x below and type  vaf  . The whole
+     (* x x) is selected, brackets included. Press <Esc>.
+
+  2. Type  vif  on the same x. Now only  * x x  is selected. Press <Esc>.
+
+  3. A count reaches outward. Type  v2af  : the enclosing (define ...) is
+     selected, the parent of the parent. Press <Esc>.
+
+  4. Type  daf  on the x to delete (* x x) and press u.
+
+  5. Type  cif  on the x, type  + x 1  and press <Esc>. The brackets stayed,
+     the contents changed.
+
+     (define (inc-square x) (* x x))
+
+  Surrounding whitespace is never included by af or if. If the cursor is not
+  inside any list, the current element is used instead.
+
+  if      inside the current list    :help <Plug>(sexp_inner_list)
+  af      the current list           :help <Plug>(sexp_outer_list)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                   Lesson 2.2: THE TOP-LEVEL FORM
+
+
+   ** iF and aF select the top-level form around the cursor. **
+
+  However deep the cursor is, aF grabs the whole definition. This is the
+  object to use for yanking a function to the REPL or moving it elsewhere.
+
+  1. Put the cursor on the z below, three levels deep, and type  vaF  .
+     Press <Esc>.
+
+  2. Type  yaF  to yank the definition, move below it and type  p  .
+     Chapter 6 explains why the paste landed so neatly. Undo with u.
+
+(define (deep a b c)
+  (let ((x (+ a b)))
+    (list x (* x c) (- x z))))
+
+  iF      inside the top-level form  :help <Plug>(sexp_inner_top_list)
+  aF      the top-level form         :help <Plug>(sexp_outer_top_list)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                    Lesson 2.3: THE CURRENT ELEMENT
+
+
+   ** ie and ae select the element under the cursor. **
+
+  This is the object you will use most. It selects an atom, a string, a
+  comment, or a whole list when the cursor is on its bracket, always with
+  the macro characters that belong to it, so  'foo  is one element.
+
+  The difference between ie and ae is whitespace. ie is only the element.
+  ae adds the whitespace you would want removed if you deleted it, no more,
+  so a delete never leaves two spaces or a dangling line.
+
+  1. Put the cursor on the b of 'b below and type  dae  . The list reads
+     (list 'a 'c) with a single space. Press u.
+
+  2. Type  die  on the same spot. Only 'b went, leaving two spaces. Press
+     u. This is why dae is usually what you want.
+
+  3. Put the cursor on the opening bracket of (+ 1 2) and type  yae  .
+     The whole list was yanked, because on a bracket the list is the
+     element.
+
+     (list 'a 'b 'c (+ 1 2) "text")
+
+  4. Type  cie  on 'c, type  'd  and press <Esc>.
+
+  If the cursor is on whitespace between elements, the following element is
+  the target.
+
+  ie      the element                :help <Plug>(sexp_inner_element)
+  ae      element plus whitespace    :help <Plug>(sexp_outer_element)
+          the whitespace rules       :help sexp-outer-element-selection-logic
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                      Lesson 2.4: STRINGS
+
+
+   ** is and as select the current string. **
+
+  1. Put the cursor inside the string below and type  cis  , type
+     a new message, press <Esc>. The quotes stayed.
+
+  2. Type  das  on the string. Quotes and all are gone. Press u.
+
+     (display "an old message")
+
+  These shadow Vim's sentence objects, which are rarely useful in code.
+  Lesson 8.1 shows how to move them to aS and iS if you disagree.
+
+  is      inside the string          :help <Plug>(sexp_inner_string)
+  as      the string with quotes     :help <Plug>(sexp_outer_string)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                  Lesson 2.5: CHILDREN BY POSITION
+
+
+   ** ic and ac select the Nth child from the head, iC and aC from the tail. **
+
+  Sometimes you know which argument you want by its position, not by where
+  the cursor is. The child objects count from the start of the current list
+  (lowercase c) or from its end (uppercase C). Without a count they select
+  the first or last child.
+
+  1. Put the cursor anywhere inside the list below and type  d2ic  . The
+     second child is gone, and a double space remains because the inner
+     object excludes whitespace. Press u.
+
+  2. Type  d2ac  instead. Gone, and tidy. Press u.
+
+  3. Type  viC  to see the last child selected. Press <Esc>.
+
+  4. Type  y3ic  to yank the third child, wherever the cursor was.
+
+     (vector alpha beta gamma delta epsilon)
+
+  How this differs from ]e and [e: the child objects count from the ends of
+  the list, the select commands count from the cursor. Use whichever needs
+  the smaller number.
+
+  ic ac   Nth child from the head    :help <Plug>(sexp_inner_child_head)
+  iC aC   Nth child from the tail    :help <Plug>(sexp_inner_child_tail)
+          comparison with ]e         :help sexp-child-objects-vs-[e-and-]e
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                 Lesson 2.6: GROWING A SELECTION
+
+
+   ** In Visual mode, 2ae pulls one more sibling into the selection. **
+
+  1. Put the cursor on beta below and type  vae  . One element. Now type
+     2ae  : the selection grows to include gamma. Type  2ae  again: delta.
+     Press <Esc>. Without a count, repeating ae only tidies the selection
+     to whole elements plus their whitespace; the count is what extends it,
+     and it counts the current selection as one.
+
+  2. Type  v3ae  to select three siblings at once.
+
+  3. Direction. Type  vie  on delta, then press  o  to move the cursor to
+     the start of the selection, then  3ie  . Now the selection grew
+     backwards to include gamma and beta. Press <Esc>.
+
+  4. Type  v2af  and then  =  to reindent what you selected. Chapter 5
+     covers indenting properly.
+
+     (define names
+       (list alpha beta gamma delta epsilon))
+
+  Everything in this chapter repeats with  .  because vim-repeat is
+  installed, and it all works from operators, so  d3ae  is a real command.
+
+  See  :help sexp-cleanup-vs-extension  for the exact rules.
+
+  You have finished Chapter 2. Objects plus operators are most of the daily
+  work. The next chapter is about typing.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                 Lesson 3.1: BRACKETS THAT PAIR
+
+
+   ** In Insert mode, brackets and quotes insert as pairs. **
+
+  vim-sexp keeps the buffer balanced while you type. Try each of these on
+  the empty line below the example.
+
+  1. Press  o  to open a line, then type  (  . You get () with the cursor
+     inside. Type  define  and a space, then  (  again: (define ()) with the
+     cursor in the inner pair. A space is added automatically when a new
+     list would touch an atom.
+
+  2. Type  )  . Instead of inserting a bracket, the cursor jumps past the
+     existing one. Type  )  again to leave the outer list.
+
+  3. Type the double-quote key and you get a pair  ""  with the cursor
+     inside. Type it again to step out. Press <Esc>.
+
+  4. Press  o  , type  (  , then press <BS>. The empty pair is removed as
+     one. The same happens for an empty pair of quotes.
+
+  5. Inside a string or a comment the brackets are inserted plainly, since
+     they are text there. To force a lone bracket anywhere, type CTRL-V
+     first.
+
+     (display "practise below this line")
+
+  ( [ {    insert a pair             :help <Plug>(sexp_insert_opening_round)
+  ) ] }    close or step out         :help <Plug>(sexp_insert_closing_round)
+  ""       insert a pair of quotes   :help <Plug>(sexp_insert_double_quote)
+  <BS>     delete an empty pair      :help <Plug>(sexp_insert_backspace)
+
+  These can be switched off with g:sexp_enable_insert_mode_mappings.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+              Lesson 3.2: INSERTING AT THE HEAD OR TAIL
+
+
+   ** \h and \l start inserting at the head or tail of the current list. **
+
+  1. Put the cursor on the b of b below, inside the list, and type  \l  .
+     You are in Insert mode just before the closing bracket. Type  c  and
+     press <Esc>.
+
+  2. On the same b type  \h  . You are at the head, and a space has been
+     placed for you so what you type does not touch the first element.
+     Type  fn  and press <Esc>.
+
+     (a b)
+
+  The cursor must be inside the list. On the opening bracket the list is
+  the element and its parent becomes the target, which at top level means
+  inserting before the whole form.
+
+  \h      insert at list head        :help <Plug>(sexp_insert_at_list_head)
+  \l      insert at list tail        :help <Plug>(sexp_insert_at_list_tail)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                  Lesson 3.3: WRAPPING AN ELEMENT
+
+
+   ** \w and \W wrap the current element in parentheses. **
+
+  Wrapping is how you turn an argument into a call. After wrapping you are
+  in Insert mode at the head (\w) or tail (\W) of the new list, so you can
+  type the function name straight away.
+
+  1. Put the cursor on x below and type  \w  . The line becomes
+     (f ( x)) with the cursor just inside the new bracket and a space
+     ready. Type  sqrt  and press <Esc>. Result: (f (sqrt x))
+
+  2. Press u. Type  \W  on x. The cursor is at the tail instead, just
+     before the new closing bracket. Press <Esc>.
+
+  3. Square and curly wrappers exist too, for Clojure vectors and maps.
+     On x type  \e[  for the head or  \e]  for the tail, then <Esc>.
+
+     (f x)
+
+  4. In Visual mode the selection is wrapped instead. Type  v2ie  on b
+     below, then  \w  , type  +  , press <Esc>. Result: (list a (+ b c) d)
+     Use the inner object here: the outer one would carry a trailing space
+     into the new brackets.
+
+     (list a b c d)
+
+  \w  \W    wrap element in ( )      :help <Plug>(sexp_round_head_wrap_element)
+  \e[ \e]   wrap element in [ ]      :help <Plug>(sexp_square_head_wrap_element)
+  \e{ \e}   wrap element in { }      :help <Plug>(sexp_curly_head_wrap_element)
+
+  If you would rather stay in Normal mode after wrapping, set
+  g:sexp_insert_after_wrap to 0.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                    Lesson 3.4: WRAPPING A LIST
+
+
+   ** \i and \I wrap the current list in a new pair of parentheses. **
+
+  The same idea one level up: the whole current list becomes the argument
+  of something new.
+
+  1. Put the cursor inside (bar 1) below and type  \i  . It is now
+     (foo ( (bar 1)) baz) with the cursor at the head of the new list.
+     Type  not  and press <Esc>.
+
+  2. Press u. Type  \I  inside (bar 1): cursor at the tail of the new list.
+     Press <Esc>.
+
+     (foo (bar 1) baz)
+
+  3. Clojure. Put the cursor inside (str a b) and type  \[  to wrap it in a
+     vector, or  \]  to do the same with the cursor at the tail. Press
+     <Esc>, then u.
+
+     (defn join [a b] (str a b))
+
+  \i  \I    wrap list in ( )         :help <Plug>(sexp_round_head_wrap_list)
+  \[  \]    wrap list in [ ]         :help <Plug>(sexp_square_head_wrap_list)
+  \{  \}    wrap list in { }         :help <Plug>(sexp_curly_head_wrap_list)
+
+  You have finished Chapter 3. Chapter 4 is the heart of paredit.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                       Lesson 4.1: SPLICE
+
+
+   ** \@ removes the brackets of the current list, keeping its contents. **
+
+  Splice is the opposite of wrap. The elements of the current list join
+  their parent in place.
+
+  1. Put the cursor on a inside (a b) below and type  \@  .
+     Result: (if p a b (c d))
+
+  2. Press u. A count splices several levels at once. On a, type  2\@  :
+     both (a b) and the if form lose their brackets.
+
+     (let ((x 1)) (if p (a b) (c d)))
+
+  3. A practical use: you wrapped too much. Undo everything, put the cursor
+     on the inner + below, type  \i  , press <Esc> to see the extra pair,
+     then  \@  to take it away again.
+
+     (* 2 (+ x y))
+
+  When a multi-line list is spliced, the result is reindented automatically.
+
+  \@      splice the current list    :help <Plug>(sexp_splice_list)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                       Lesson 4.2: RAISE
+
+
+   ** \o replaces the parent with the current list; \O with the element. **
+
+  Raise is for removing a layer you no longer want: the surrounding call
+  goes away and the thing under the cursor takes its place.
+
+  1. Put the cursor on x inside (sqrt x) below and type  \O  . The
+     element x replaced its parent list: (f (g x))
+
+  2. Press u. Put the cursor inside (sqrt x) and type  \o  . This time the
+     whole list (sqrt x) replaced its parent (g ...): (f (sqrt x))
+
+     (f (g (sqrt x)))
+
+  3. With a count, more ancestors are replaced. Press u, then on x type
+     2\O  : two levels go and only (f x) remains.
+
+  4. In Visual mode the selection is raised. Select  b c  in the list below
+     with  vae  ae  and type  \o  . Result: (a b c)
+
+     (outer (a b c d))
+
+  \o      raise the current list     :help <Plug>(sexp_raise_list)
+  \O      raise the current element  :help <Plug>(sexp_raise_element)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                Lesson 4.3: SLURP AND BARF, CAPTURE AND EMIT
+
+
+   ** The list grows or shrinks by moving its closing bracket. **
+
+  In paredit slurping pulls the next element into the list and barfing
+  pushes the last element out. vim-sexp calls them capture and emit, and
+  gives each a direction: at the tail, moving the closing bracket, or at
+  the head, moving the opening one.
+
+     <M-S-l>   capture the next sibling into the list    slurp forward
+     <M-S-h>   capture the previous sibling               slurp backward
+     <M-S-k>   emit the last element out of the list     barf forward
+     <M-S-j>   emit the first element out of the list    barf backward
+
+  1. Put the cursor on foo below and press <M-S-l>. The bracket after foo
+     moved right, past bar: ((foo bar) baz). Press it again to capture baz.
+
+     ((foo) bar baz)
+
+  2. Now the reverse. Put the cursor on bar below and press <M-S-k>. The
+     closing bracket moved left: (((foo) bar)). The cursor stays with bar,
+     which is now outside the inner list, so pressing again emits from the
+     next list up. This cursor escape is deliberate; see the help if you
+     would rather the cursor stick to the bracket.
+
+     (((foo bar)))
+
+  3. The practical case. In the let below, the body was accidentally
+     written outside the let. Put the cursor on the y inside the bindings,
+     press <M-S-l> once and the (+ x y) is captured into the let where it
+     belongs.
+
+     (let ((x 1) (y 2))) (+ x y)
+
+  4. Head direction. Put the cursor on c below and press <M-S-h> to
+     capture b from the left. Press <M-S-j> to emit it again.
+
+     (a b (c d))
+
+  Multi-line captures and emits reindent automatically.
+
+  <M-S-l>  capture next   :help <Plug>(sexp_capture_next_element)
+  <M-S-h>  capture prev   :help <Plug>(sexp_capture_prev_element)
+  <M-S-k>  emit tail      :help <Plug>(sexp_emit_tail_element)
+  <M-S-j>  emit head      :help <Plug>(sexp_emit_head_element)
+           cursor rules   :help sexp-emit-cursor-logic
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                        Lesson 4.4: SWAP
+
+
+   ** <M-l> and <M-h> swap the element with its neighbour. **
+
+  Reordering arguments or let bindings is a swap, not a cut and paste.
+
+  1. Put the cursor on bar below and press <M-l>. Result: (foo baz bar)
+     Press <M-h> to swap back.
+
+     (foo bar baz)
+
+  2. Lists swap with <M-j> and <M-k>. Put the cursor inside (b 2) below and
+     press <M-k>: the binding moves up past (a 1).
+
+     (let ((a 1)
+           (b 2))
+       (list a b))
+
+  3. Pairs. In Clojure maps and let vectors, items come in pairs, and a
+     Visual selection is swapped as one unit. Select  :b 2  below with
+     v2ie  and press <M-h> twice: the pair travels past 1 and then past
+     :a, giving {:b 2 :a 1}, with the key still next to its value.
+
+     {:a 1 :b 2}
+
+  A swap does nothing when there is no neighbour in that direction.
+
+  <M-l> <M-h>   swap element forward, backward  :help <Plug>(sexp_swap_element_forward)
+  <M-j> <M-k>   swap list forward, backward     :help <Plug>(sexp_swap_list_forward)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                        Lesson 4.5: CLONE
+
+
+   ** \c copies the current list next to itself; \C copies the element. **
+
+  Faster than yank and put when you want a near duplicate, for example a
+  second cond clause or a second binding.
+
+  1. Put the cursor on bar below and type  \C  . Result: (foo bar bar baz)
+     The cursor stays on the original, so  cie  now changes the copy.
+
+     (foo bar baz)
+
+  2. Put the cursor inside the second clause below and type  \c  . The
+     clause is duplicated on its own line, because it lived on a line by
+     itself, and the block is reindented.
+
+     (cond ((< x 0) 'negative)
+           ((= x 0) 'zero))
+
+  3. A count makes several copies: 3\C on an element.
+
+  \c      clone the current list     :help <Plug>(sexp_clone_list)
+  \C      clone the current element  :help <Plug>(sexp_clone_element)
+          single or multi line       :help sexp-clone-logic
+
+  You have finished Chapter 4. Splice, raise, capture, emit, swap and clone
+  are the moves that make brackets stop mattering.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                       Lesson 5.1: INDENT
+
+
+   ** == reindents the current list, =- the whole top-level form. **
+
+  vim-sexp replaces == in Lisp buffers so that it indents by structure
+  rather than by line.
+
+  1. Put the cursor inside the badly indented form below and type  ==  .
+     Only the current list moves. Type  =-  to fix the entire top-level
+     form.
+
+(define (messy a b)
+      (let ((s (+ a b)))
+  (if (> s 10)
+          'big
+   'small)))
+
+  2. A count indents that many enclosing lists: 2== from the if fixes the
+     let too.
+
+  3. In Visual mode press  =  , the selection is first widened to whole
+     lists.
+
+  ==      indent the current list    :help <Plug>(sexp_indent)
+  =-      indent the top-level form  :help <Plug>(sexp_indent_top)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                   Lesson 5.2: INDENT AND CLEAN
+
+
+   ** <M-=> and <M--> also remove extra whitespace. **
+
+  These do everything == and =- do, and additionally collapse runs of spaces
+  and stray blank lines according to the same rules ae uses.
+
+  1. Put the cursor inside the form below and press <M-=>.
+
+     (list  a    b
+        c
+
+
+        d)
+
+  If you always want cleaning, set g:sexp_indent_does_clean to 1 and use
+  == alone.
+
+  <M-=>   indent and clean list      :help <Plug>(sexp_indent_and_clean)
+  <M-->   indent and clean top form  :help <Plug>(sexp_indent_and_clean_top)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                  Lesson 5.3: ALIGNING COMMENTS
+
+
+   ** \A aligns the trailing comments of the top-level form. **
+
+  1. Put the cursor anywhere in the form below and type  \A  . The
+     comments line up in sensible groups.
+
+(define config
+  (list 'width 80 ;; columns
+        'height 24     ;; rows
+        'title "demo"       ;; window title
+        'debug #f))  ;; off in production
+
+  \a works on the current list only and takes a count. Alignment groups are
+  chosen by a small optimiser; the weights are options if you want to tune
+  them, but the default is good.
+
+  \a      align comments in list     :help <Plug>(sexp_align_comments)
+  \A      align comments in top form :help <Plug>(sexp_align_comments_top)
+          how groups are chosen      :help sexp-comment-alignment
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                    Lesson 5.4: AUTOMATIC INDENT
+
+
+   ** Structural commands reindent what they touched. **
+
+  You may have noticed that clone, raise, splice, capture and emit fix the
+  indentation of multi-line results on their own. That is automatic and
+  can be turned off, globally with g:sexp_auto_indent or per command with
+  g:sexp_clone_does_indent, g:sexp_raise_does_indent,
+  g:sexp_splice_does_indent and g:sexp_capture_emit_does_indent.
+
+  There is nothing to practise here. Read  :help sexp-auto-indent  once.
+
+  You have finished Chapter 5.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                   Lesson 6.1: SMART PUT
+
+
+   ** p and P put the register after or before the current element. **
+
+  In Lisp buffers p and P are contextual: when the register holds a form
+  and the cursor is on code, vim-sexp puts it as an element, with the right
+  whitespace and indentation, and on its own line when that is what the
+  neighbours do. When that does not apply, for example plain text in a
+  comment, the ordinary p and P run instead.
+
+  1. Put the cursor on beta below and type  yie  , then move to alpha and
+     type  p  . beta was inserted as a sibling after alpha with one space,
+     and the cursor sits at the head of what was put.
+
+     (list alpha gamma beta)
+
+  2. On a bracket the put goes inside. Put the cursor on the opening
+     bracket of (inner) below with beta still in the register and type  p  :
+     it lands at the head of the list. P on a bracket puts at the tail.
+
+     (outer (inner) other)
+
+  3. A count on a bracket chooses the position: 2p puts before the second
+     child.
+
+  4. Yank a whole definition with  yaF  from Lesson 2.2, move to a blank
+     line after another definition and type  p  . It arrives on its own
+     line, indented from column one, with the blank line kept.
+
+  p       put after element          :help <Plug>(sexp_put_after)
+  P       put before element         :help <Plug>(sexp_put_before)
+          the contextual rules       :help sexp-regput-contextual-smart-commands
+          put on a bracket           :help sexp-regput-behavior-on-bracket
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                    Lesson 6.2: REPLACE
+
+
+   ** Visual p replaces the selection; gp replaces the element. **
+
+  1. Put the cursor on new below and type  yie  . Move to old, type  vie
+     and then  p  . The selection was replaced and the register now holds
+     old, as in ordinary Vim. Using P instead leaves the register alone.
+
+  2. Type  gp  on the other old to replace it without selecting first.
+     gP is the register-preserving variant.
+
+     (f old (g old) new)
+
+  3. Registers work as usual: "ayie then "agp.
+
+  4. One rule worth knowing: p, P, gp and gP are contextual, and by default
+     they fall back to Vim's own paste when the register holds a single
+     character, is linewise, or is not a complete form. So yanking a
+     one-letter atom and pressing gp inserts it the plain way. The option
+     g:sexp_regput_fallback_source lists the conditions; the operators of
+     the next lesson never fall back.
+
+  The selection must be whole elements within one list. A partial selection
+  is refused with a message rather than leaving broken brackets.
+
+  {Visual}p  P    replace selection  :help sexp-replace-visual
+  gp  gP          replace element    :help sexp-replace-normal
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                  Lesson 6.3: PUT INTO A LIST
+
+
+   ** \<p and \>p put into the current list by position. **
+
+  These are the long forms of putting at a position: \<p before the Nth
+  child from the head, \>p after the Nth child from the tail. The next
+  lesson shows the shorter operator spelling that the docs recommend.
+
+  1. Yank z below with  yie  , put the cursor inside the list and type
+     2\<p  . z is now before the second child.
+
+     (a b c) z
+
+  \<p     put before Nth from head   :help <Plug>(sexp_put_at_head)
+  \>p     put after Nth from tail    :help <Plug>(sexp_put_at_tail)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                 Lesson 6.4: PUT AND REPLACE OPERATORS
+
+
+   ** >p and <p put after or before a target; <M-p> replaces a target. **
+
+  These are operators, so they take any motion or object from Chapters 1
+  and 2 as their target. That is what makes them powerful: put before the
+  last element, put after the third sibling, replace the second child, all
+  without moving the cursor first.
+
+  1. Yank z below with  yie  . Put the cursor on c and type  <piC  :
+     z was put before the last child. Press u.
+
+  2. Type  >p3<M-e>  : z was put after the third sibling from the cursor,
+     which is e. 3<M-e> is used rather than 2<M-w> because <M-e> is
+     inclusive. Press u.
+
+  3. The replace operator. Type  <M-p>2ic  : the second child is replaced
+     by z, and the register now holds what was there, b. Press u. Type
+     <M-p>ie  : the element under the cursor is replaced. <M-P> does the
+     same without updating the register.
+
+     (a b c d e) z
+
+  4. Do not put a count before the operator itself, only on its motion.
+     Repeating with  .  works when the target was a sexp object.
+
+  <M-p> <M-P>   replace target       :help sexp-replace-operator
+  >p  <p        put after, before    :help sexp-put-operator
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                  Lesson 6.5: TELESCOPIC TARGETS
+
+
+   ** A search motion after <M-p> targets the form it lands on. **
+
+  This is marked experimental in the docs, but it works as described and
+  is the most impressive trick in the plugin. When the operator's motion
+  crosses a list boundary, it is not treated as a range to replace but as
+  a way of pointing at a distant form. A search is such a motion.
+
+  1. Swapping two distant elements without moving the cursor. Put the
+     cursor on baz below and type:
+
+        yie               yank baz
+        <M-p>?foo<CR>     replace foo, far away, with baz; register now foo
+        <M-p>ie           replace baz, right here, with foo
+
+     (foo (bar)
+          (baz))
+
+  2. Swapping the second and last elements of a long list, three commands
+     whatever its length. Put the cursor inside the list and type:
+
+        y2ic       yank the second child
+        <M-p>iC    replace the last child with it
+        <M-p>2ic   replace the second child with the old last one
+
+     (op one two three four five six)
+
+  The option g:sexp_regput_tele_motion widens or narrows when telescopic
+  mode applies. Read  :help sexp-regput-telescopic-motion  before relying
+  on this, and undo generously while you learn it: a motion that is not
+  taken as telescopic is taken as a range, and replaces everything in it.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                 Lesson 6.6: WHEN PASTE FALLS BACK
+
+
+   ** Unbalanced registers are checked, and the builtin p is still there. **
+
+  Before putting, vim-sexp parses the register as Lisp. If the brackets do
+  not balance you are asked whether to continue, which is the moment to say
+  no and fix the register. g:sexp_regput_invalid_register_action changes
+  the default answer.
+
+  If you ever want Vim's plain p and P in a Lisp buffer, Lesson 8.1 shows
+  the mapping override; the docs suggest binding the builtins to  \\p  and
+  \\P  as aliases.
+
+  See  :help sexp-regput-register-parsing  and
+  :help sexp-regput-builtin-overrides
+
+  You have finished Chapter 6.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                  Lesson 7.1: FLOWING THROUGH LISTS
+
+
+   ** <M-]> dives into the next list; <M-}> climbs out to the next close. **
+
+  The sibling motions of Lesson 1.3 refuse to leave the current list. The
+  flow commands are the opposite: they cross list boundaries freely, and a
+  chain of them can walk from one end of a file to the other. They land
+  only on brackets.
+
+     <M-]>  next opening bracket, in     <M-[>  previous closing bracket, in
+     <M-}>  next closing bracket, out    <M-{>  previous opening bracket, out
+
+  1. Put the cursor at the start of the line below and press <M-]> six
+     times. You visit every opening bracket in order, depth first.
+
+     (x1 (x2) (x3 (x4) (x5))) (x6)
+
+  2. Press <M-{> six times to visit them in reverse: the two rewind each
+     other.
+
+  3. From the same start press <M-}> repeatedly. Now only closing brackets
+     are visited, so you climb out of each list in turn.
+
+  In Visual mode a flow command selects the list it lands on rather than
+  extending the selection, so the brackets cannot be unbalanced. There is
+  deliberately no operator-pending form.
+
+  <M-]> <M-[>   :help <Plug>(sexp_flow_to_next_open)  and  sexp_flow_to_prev_close
+  <M-}> <M-{>   :help <Plug>(sexp_flow_to_next_close) and  sexp_flow_to_prev_open
+
+NOTE: If your terminal does not deliver <M-{> or <M-}>, the docs suggest
+      the equivalent <M-S-[> and <M-S-]>.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                   Lesson 7.2: FLOWING LEAF TO LEAF
+
+
+   ** <M-S-w> and <M-S-b> jump from atom to atom, ignoring brackets. **
+
+  These are the leaf versions of the flow commands: they never stop on a
+  bracket, and they never stop at a list edge. Together with Lesson 7.1
+  they can reach every element in the file, and each element is reached by
+  exactly one of the two families.
+
+  1. Put the cursor on define below and press <M-S-w> repeatedly. The
+     cursor hops over every bracket to the next atom: walk, tree, f, ...
+
+  2. <M-S-b> goes back, and <M-S-e> and <M-S-g> land on the ends of atoms
+     instead of their heads.
+
+     (define (walk tree f)
+       (if (pair? tree)
+           (map (lambda (t) (walk t f)) tree)
+           (f tree)))
+
+  3. The idiom from the docs: in Normal mode,  v3<M-S-w>  selects the third
+     atom ahead of the cursor, however deeply it is nested. Try it from
+     define: it selects f.
+
+  <M-S-w> <M-S-b>   next, previous leaf head   :help <Plug>(sexp_flow_to_next_leaf_head)
+  <M-S-e> <M-S-g>   next, previous leaf tail   :help <Plug>(sexp_flow_to_next_leaf_tail)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                     Lesson 7.3: CONVOLUTE
+
+
+   ** \? swaps the current list with its parent around the cursor. **
+
+  Convolute is the hardest command to describe and the easiest to
+  recognise once you have needed it: a let binding sits too deep, and you
+  want its scope to include the form around it. Convolute lifts the head of
+  the current list, everything before the cursor, up past the parent, and
+  leaves the tail where it was.
+
+  1. Put the cursor on the opening bracket of (+ x y) below and type  \?  .
+     The let now encloses the baz call:
+
+        (defun foo (a b)
+          (if (bar x y)
+              (let ((x 1) (y 2))
+                (baz (+ x y)))))
+
+  2. Press u. Type  2\?  on the same spot. The let climbs two levels and
+     encloses the if as well.
+
+(defun foo (a b)
+  (if (bar x y)
+      (baz (let ((x 1) (y 2))
+             (+ x y)))))
+
+  vim-sexp splits the list at the head of the current element, never in the
+  middle of an atom, which is the difference from the Emacs original.
+
+  \?      convolute                  :help <Plug>(sexp_convolute)
+
+  You have finished Chapter 7. What remains is configuration.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                  Lesson 8.1: CHANGING THE KEYS
+
+
+   ** g:sexp_mappings rebinds any command; an empty string unbinds it. **
+
+  Every mapping in this tutor is a default from a dictionary that your
+  vimrc can override before the plugin loads. Keys are the <Plug> names
+  without the <Plug>( ) part. Three examples from the docs:
+
+     Move the bracket motions off ( and ) and the string objects off as and
+     is, restoring Vim's sentence commands:
+
+        let g:sexp_mappings = {
+          \ 'sexp_outer_string':          'aS',
+          \ 'sexp_inner_string':          'iS',
+          \ 'sexp_move_to_prev_bracket':  'g(',
+          \ 'sexp_move_to_next_bracket':  'g)',
+          \ }
+
+     Keep Vim's own p and P reachable as \\p and \\P:
+
+        let g:sexp_mappings = {'p': '<LocalLeader><LocalLeader>p',
+          \                    'P': '<LocalLeader><LocalLeader>P'}
+
+     Unbind something entirely:
+
+        let g:sexp_mappings = {'sexp_convolute': ''}
+
+  Mappings are only created for filetypes in g:sexp_filetypes, which this
+  configuration sets to clojure, scheme, lisp, timl, fennel and racket.
+  The <Plug> names exist everywhere, so you can map them in any buffer.
+
+  See  :help g:sexp_mappings  and  :help sexp-explicit-mappings
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                  Lesson 8.2: META KEYS IN A TERMINAL
+
+
+   ** gvim understands Alt; terminal Vim may need to be told. **
+
+  Fourteen defaults use Meta: the sibling motions, swaps, capture and emit,
+  the flow commands, the clean indents and the replace operators. In gvim
+  they simply work. In a terminal, Alt usually sends Escape followed by the
+  key, and Vim has to be told that sequence means <M-x>. The docs give the
+  recipe, one line per key, where the character before the letter is a
+  literal Escape typed with CTRL-V <Esc>:
+
+        set <M-j>=<Esc>j
+
+  The alternative that avoids the problem altogether is to rebind those
+  commands to LocalLeader sequences with g:sexp_mappings, for example
+  'sexp_swap_element_forward': '<LocalLeader>L'
+
+  See  :help sexp-mappings  , the paragraph on Meta and Alt keys.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                    Lesson 8.3: WHERE TO READ MORE
+
+
+  :help sexp-mappings          every command, grouped as in this tutor
+  :help sexp-options           every option, with defaults
+  :help sexp-smart-paste       the long story behind Chapter 6
+  :help <Plug>(sexp_...)       any single command by its <Plug> name
+  :help sexptutor              this tutor and how to reopen it
+
+  The plugin lives in pack/guns/start/vim-sexp and its full manual is
+  pack/guns/start/vim-sexp/doc/vim-sexp.txt
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                          CHEAT SHEET
+
+
+  MOVE          (  )   brackets         <M-w> <M-b> <M-e> g<M-e>  siblings
+                [[ ]]  top-level forms  ]e [e   select next, previous sibling
+  FLOW          <M-]> <M-}> <M-[> <M-{>  list flow, in and out
+                <M-S-w> <M-S-b> <M-S-e> <M-S-g>  leaf flow
+  OBJECTS       if af  list             iF aF   top-level form
+                ie ae  element          is as   string
+                ic ac  Nth child, head  iC aC   Nth child, tail
+  TYPE          ( [ { ""  pairs         ) ] }   step out   <BS> unpair
+                \h \l  insert at head, tail of list
+  WRAP          \w \W  element ( )      \e[ \e] \e{ \e}  element [ ] { }
+                \i \I  list ( )         \[ \] \{ \}      list [ ] { }
+  RESHAPE       \@     splice           \o \O   raise list, element
+                <M-S-l> <M-S-h>  capture next, previous   (slurp)
+                <M-S-k> <M-S-j>  emit tail, head          (barf)
+                <M-l> <M-h>  swap element   <M-j> <M-k>  swap list
+                \c \C  clone list, element   \?  convolute
+  TIDY          == =-  indent list, top    <M-=> <M-->  indent and clean
+                \a \A  align comments in list, top
+  PASTE         p P    put after, before   {Visual}p P  replace selection
+                gp gP  replace element     \<p \>p      put into list by index
+                <M-p> <M-P>  replace target   >p <p  put after, before target
+
+  Counts work on nearly everything. Undo works on everything.
+
+===============================================================================
+  This tutor is part of the vimfiles repository, in tutor/sexptutor.txt.
+  It describes vim-sexp as of May 2026. If a lesson disagrees with the
+  plugin, the plugin's own help wins; please fix the lesson.
+===============================================================================

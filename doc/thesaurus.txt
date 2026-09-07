@@ -1,0 +1,49 @@
+*thesaurus.txt*   Synonym completion from the Moby Thesaurus   *thesaurus-plugin*
+
+                                        *thesaurus.vim* *thesaurus#complete*
+A 'thesaurusfunc' backed by the Moby Thesaurus, so |i_CTRL-X_CTRL-T|
+completes synonyms. Lives in autoload/thesaurus.vim; the vimrc sets: >
+    set thesaurusfunc=thesaurus#complete
+<
+1. Using it                                     |thesaurus-usage|
+2. The data file                                |thesaurus-file|
+3. Why not the 'thesaurus' option               |thesaurus-why|
+
+==============================================================================
+1. Using it                                                  *thesaurus-usage*
+
+In Insert mode, with the cursor after a word, press CTRL-X CTRL-T.
+
+- On a whole headword, the menu lists its synonyms; CTRL-N and CTRL-P step
+  through them and the chosen one replaces the word.
+- On a partial word, the menu lists headwords starting with it. Pick one,
+  then press CTRL-X CTRL-T again for its synonyms.
+- Capitalisation follows what you typed: `Happy` gives `Accepting`, `HAPPY`
+  gives `ACCEPTING`.
+
+The file is read once per session, on first use, in well under a second.
+
+==============================================================================
+2. The data file                                              *thesaurus-file*
+
+                                                           *g:thesaurus_file*
+The plugin reads `thesaurus/mthesaur.txt` next to the vimfiles autoload
+directory, or the path in g:thesaurus_file. That file is the public-domain
+Moby Thesaurus II by Grady Ward, Project Gutenberg ebook 3202, about 24 MB,
+and is not tracked in the repository. Fetch it with: >
+
+    curl -L -o thesaurus/mthesaur.txt https://www.gutenberg.org/files/3202/files/mthesaur.txt
+<
+Each line is a headword followed by its synonyms, comma separated. If the
+file is missing, the first completion attempt says so.
+
+==============================================================================
+3. Why not the 'thesaurus' option                              *thesaurus-why*
+
+Vim's built-in handling of 'thesaurus' rescans the whole file on every
+completion and truncates lines longer than 510 bytes. Moby lines run past
+3,600 bytes, so most entries would lose the majority of their synonyms.
+Loading the file once into a dictionary keyed by headword avoids both
+problems.
+
+ vim:tw=78:ts=8:ft=help:norl:

@@ -1,0 +1,32 @@
+*sexptutor.txt*   A vimtutor-style tutor for vim-sexp          *sexptutor-plugin*
+
+                                                *sexptutor* *sexp-tutor*
+A hands-on tutor for the vim-sexp plugin, structured like |vimtutor|:
+eight chapters from bracket motions to convolution, each with exercises
+and pointers into |vim-sexp.txt|. The text lives in tutor/sexptutor.txt.
+
+                                                                *:SexpTutor*
+:SexpTutor              Copy the tutor to a temporary `.scm` file and edit
+                        it. The copy has the scheme filetype, so the
+                        vim-sexp mappings are active, and the original is
+                        never modified. Automatic indentation is switched
+                        off in the copy so that reindenting commands only
+                        touch the code examples.
+
+:SexpTutor!             Open the original tutor file itself, for editing
+                        the lessons.
+
+Chapters ~
+    1  Moving through structure   brackets, siblings, top-level forms, ]e
+    2  Text objects               if af, iF aF, ie ae, is as, children
+    3  Typing balanced code       auto pairs, \h \l, wrapping
+    4  Reshaping                  splice, raise, capture/emit, swap, clone
+    5  Keeping it tidy            indent, clean, comment alignment
+    6  Smart paste                p P gp gP, operators, telescopic mode
+    7  Flowing across lists       list and leaf flow, convolute
+    8  Making it yours            g:sexp_mappings, Meta keys in terminals
+
+The tutor ends with a one-screen cheat sheet. In this configuration
+|maplocalleader| is a backslash, so `<LocalLeader>w` is typed `\w`.
+
+ vim:tw=78:ts=8:ft=help:norl:

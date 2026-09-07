@@ -1,0 +1,167 @@
+*geospell.txt*   A geophysics spelling dictionary you maintain in git   *geospell-plugin*
+
+                                                *geospell* *plugin-geospell*
+Vim's `en_us` spell checking, extended with the vocabulary of geophysics:
+technical terms, acronyms, names from the literature. The dictionary is
+generated from small tracked word lists, so the repository carries the
+lists and the generator, never the compiled file. Lives in
+plugin/geospell.vim and autoload/geospell.vim.
+
+1. Files                                        |geospell-files|
+2. Using the dictionary                         |geospell-usage|
+3. Adding words                                 |geospell-add|
+4. Removing words                               |geospell-remove|
+5. Updating the base list                       |geospell-update|
+6. Commands and options                         |geospell-commands|
+7. How the build works                          |geospell-build|
+
+==============================================================================
+1. Files                                                      *geospell-files*
+
+spell/geophysics/words.txt      The vocabulary, one word per line. Tracked.
+                                Sorted on every write; `#` starts a comment.
+spell/geophysics/reject.txt     Words that must never be included, even if
+                                a harvest finds them again. Tracked.
+spell/geophysics/fetch-corpus.py
+                                Downloads text to mine for candidates.
+                                Tracked.
+spell/geophysics/corpus/        The downloaded and extracted text. Not
+                                tracked; regenerate with the script.
+spell/geophysics.utf-8.spl      The compiled dictionary. Not tracked;
+                                rebuilt automatically when the lists are
+                                newer than it.
+
+==============================================================================
+2. Using the dictionary                                       *geospell-usage*
+
+The vimrc sets: >
+    set spelllang=en_us,geophysics
+<
+so `:set spell` checks against both. A word is accepted if either list knows
+it. Case follows Vim's rules: a lowercase entry such as `magnetometer` also
+accepts `Magnetometer` and `MAGNETOMETER`; an entry with capitals such as
+`Bouguer` or `TMI` accepts only that spelling and its all-capitals form.
+
+The usual keys keep working: `]s` and `[s` move between misspellings, `z=`
+suggests, and `zg` adds a word to your personal `spell/en.utf-8.add`, which
+is separate from this dictionary. Use `zg` for one-off words and
+|:GeoSpellAdd| for vocabulary the field shares.
+
+==============================================================================
+3. Adding words                                                 *geospell-add*
+
+One or a few words ~
+                                                                *:GeoSpellAdd*
+:GeoSpellAdd            Add the word under the cursor.
+:GeoSpellAdd {words}    Add each word given.
+
+The words go into words.txt, are removed from reject.txt if they were
+there, and the dictionary is rebuilt at once, so the red underline goes away
+without leaving Vim.
+
+Many words at once ~
+                                          *:GeoSpellHarvest* *:GeoSpellAccept*
+:GeoSpellHarvest {paths}
+                        Scan files for words `en_us` does not know and open
+                        a review buffer listing them, most frequent first,
+                        one `count<Tab>word` per line. {paths} can be files,
+                        globs, or directories (searched recursively for
+                        .tex .typ .md .txt .bib .rst .org). Words already in
+                        words.txt or reject.txt are not listed, nor words
+                        seen fewer than |g:geospell_min_count| times.
+                        Without {paths} the corpus directory is scanned.
+
+                        In the review buffer, delete the lines you do not
+                        want. `dd` on a line, `:g/^\d\+\tSomeName/d` for a
+                        pattern, or `:v/geo/d` to keep only lines matching
+                        something. Then:
+
+:GeoSpellAccept         Add every remaining word to words.txt, rebuild, and
+                        close the review buffer.
+
+A good habit after finishing a manuscript: `:GeoSpellHarvest %` in it and
+accept what is really vocabulary.
+
+By hand ~
+
+Edit spell/geophysics/words.txt directly; it is plain text. The dictionary
+rebuilds the next time Vim starts, or now with |:GeoSpellBuild|.
+
+==============================================================================
+4. Removing words                                            *geospell-remove*
+
+                                                             *:GeoSpellRemove*
+:GeoSpellRemove         Remove the word under the cursor.
+:GeoSpellRemove {words} Remove each word given.
+
+Removed words are appended to reject.txt so that no later harvest brings
+them back; delete a line from reject.txt to allow the word again. Editing
+either file by hand works as well; rebuild afterwards.
+
+Why a reject list: the base list came partly from corpora, which contain
+misspellings, OCR errors and other people's typos. When one of those turns
+up as an accepted word, remove it once and it stays gone.
+
+==============================================================================
+5. Updating the base list                                    *geospell-update*
+
+The base list was built from these sources:
+
+- The user's own manuscripts and translations (Typst, LaTeX, BibTeX).
+- The English side of Cherepovski's English-Russian dictionary of
+  geophysics, extracted from the epub in Documents/kogan-translation.
+- Wikipedia articles in the geophysics category tree and neighbouring
+  categories: seismology, geodesy, geomagnetism, gravimetry, geophysical
+  imaging, petroleum geology, mineral exploration, geostatistics, inverse
+  problems, radiometric dating, remote sensing, structural geology,
+  petrology, sedimentology, and for exploration and economic geology:
+  economic geology, ore deposits, mining, mineralogy, geochemistry,
+  hydrogeology and well logging. One dictionary covers all of it; Vim
+  loads it per buffer at no noticeable cost, and the fields overlap too
+  much to be worth separating.
+- Titles and abstracts of recent arXiv physics.geo-ph submissions.
+
+To refresh the corpus and re-harvest: >
+    python spell/geophysics/fetch-corpus.py        " minutes; rate limited
+    :GeoSpellHarvest                               " scans the corpus dir
+<
+then review and |:GeoSpellAccept|. Raise |g:geospell_min_count| for a
+stricter harvest of a large corpus (3 or more is sensible for Wikipedia
+text, 2 for your own writing). Words already accepted or rejected never
+reappear, so a refresh only shows what is new.
+
+To add a source of your own, put text files in spell/geophysics/corpus/
+or pass their paths to |:GeoSpellHarvest|. The script's category list and
+sizes are plain constants near the top of fetch-corpus.py.
+
+==============================================================================
+6. Commands and options                                    *geospell-commands*
+
+:GeoSpellBuild                                                *:GeoSpellBuild*
+                        Compile words.txt minus reject.txt into the .spl and
+                        reload it in windows that use it.
+
+:GeoSpellStats                                                *:GeoSpellStats*
+                        Word and reject counts, and when the .spl was built.
+
+                                                        *g:geospell_min_count*
+g:geospell_min_count    Minimum occurrences for a harvested word to be
+                        listed. Default 2.
+
+                                                          *g:geospell_sources*
+g:geospell_sources      List of paths scanned by |:GeoSpellHarvest| when no
+                        paths are given. Default: the corpus directory.
+
+==============================================================================
+7. How the build works                                        *geospell-build*
+
+|:mkspell| wants a Hunspell-style pair of files. The build writes a minimal
+affix file containing only `SET UTF-8` and a .dic listing the words, into a
+temporary directory, and runs
+`:mkspell! spell/geophysics {tmp}/geophysics`. No affix rules are used:
+inflected forms found in the sources are listed as separate words, which
+keeps the list obvious and greppable. Building a few thousand words takes
+well under a second and happens at startup whenever words.txt or reject.txt
+is newer than the .spl.
+
+ vim:tw=78:ts=8:ft=help:norl:

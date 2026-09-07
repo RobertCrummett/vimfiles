@@ -1,0 +1,90 @@
+*synexplore.txt*   Why is this text coloured like that?      *synexplore-plugin*
+
+                                            *synexplore* *plugin-synexplore*
+Reports about highlighting, opened in a help-style window you can search
+and yank from. Every group and rule is labelled with where it was set and
+whether that file is yours to edit. Lives in plugin/synexplore.vim and
+autoload/synexplore.vim.
+
+1. Commands                                     |synexplore-commands|
+2. The report window                            |synexplore-window|
+3. Reading a report                             |synexplore-reading|
+
+==============================================================================
+1. Commands                                               *synexplore-commands*
+
+                                                    *:SynCursor* *:SynExplore*
+:SynCursor              Describe the character under the cursor: the syntax
+:SynExplore             stack from outermost to innermost with the item
+                        that supplies the colour marked `<== applies`; for
+                        each item, its rule text, the file and line that
+                        defines the rule, the link chain down to the colour,
+                        where each link was set, and the colour on screen.
+                        Window matches from |:match| and |matchadd()| that
+                        can override syntax are listed too. Move the cursor
+                        and run it again for another spot.
+
+:SynCursor!             Echo a short form of the same report instead of
+                        opening a window.
+
+                                                                  *:SynGroup*
+:SynGroup {group}       One highlight group: its link chain, the attributes
+                        of every hop, where each was set, and the effective
+                        colour. Completes group names.
+
+                                                             *:SynHighlights*
+:SynHighlights [pat]    Every highlight group, or those whose name matches
+                        the pattern [pat] (case-insensitive), one per line:
+                        the name, a sample drawn in that group, its own link
+                        or attributes, the colour on screen, and its source
+                        tagged `[yours]`, `[runtime]` or `[default]`.
+
+                                                                  *:SynRules*
+:SynRules               The syntax rules in effect for the current buffer,
+                        with a short primer on how Vim picks between them.
+:SynRules {group}       The rules defining {group}, where they come from,
+                        and the group's link chain.
+
+==============================================================================
+2. The report window                                        *synexplore-window*
+
+Reports open in a split above the current window, read-only, unlisted, and
+kept out of the jumplist and the alternate-file history. The buffer is wiped
+as soon as the window is closed or the buffer hidden, so nothing lingers.
+A second report reuses the window.
+
+q                       Close the report.
+:w {name}               Keep it: the text is written to {name} and that file
+                        replaces the report in the window as an ordinary
+                        buffer, still highlighted. A bare `:w` explains this.
+
+==============================================================================
+3. Reading a report                                        *synexplore-reading*
+
+Sources. Highlight groups carry the file and line they were last set from,
+which Vim records. Syntax rules do not, so the plugin searches the syntax
+files for the buffer's 'syntax', their after/ counterparts, and the files
+they include, and reports each defining line as `rule from:`.
+
+Owners. Each source is classified:
+  your colorscheme, editable        a file under vimfiles/colors
+  your vimfiles, editable           anything else under vimfiles
+  a plugin package under vimfiles   under vimfiles/pack
+  your vimrc, editable
+  system runtime, not editable      under $VIMRUNTIME; override it from
+                                    vimfiles instead
+  Vim built-in default              no file at all
+
+Precedence, in brief. Keywords beat match and region items starting at the
+same place. Among match/region items, the one defined last wins at the same
+position, while an item that started earlier keeps priority until it ends.
+Contained items apply only inside items that list them. A transparent item
+takes the colour of what contains it. The innermost applicable item on the
+stack supplies the colour, and window matches can still override it.
+
+Colours in the report. Group names in stack items, link chains and headings
+are drawn in their own highlight, so the colour is visible next to its
+description. When no GUI or terminal colour is active, the report says
+`declared` and lists the attributes the group defines.
+
+ vim:tw=78:ts=8:ft=help:norl:

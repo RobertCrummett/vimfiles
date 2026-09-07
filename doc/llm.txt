@@ -1,0 +1,295 @@
+*llm.txt*   Completion from a local language model              *llm-plugin*
+
+                                                          *llm* *plugin-llm*
+Insert-mode completion backed by an open-weight model running on your own
+GPU, in the style of |i_CTRL-X|. Nothing runs until you ask; the first
+completion starts the server in the background, and it dies with Vim.
+Lives in plugin/llm.vim and autoload/llm.vim; models in models/.
+
+1. Keys                                         |llm-keys|
+2. What the model sees                          |llm-context|
+3. Speed                                        |llm-speed|
+4. What it tells you                            |llm-messages|
+5. The server                                   |llm-server|
+6. Models and weights                           |llm-models|
+7. Commands                                     |llm-commands|
+8. Options                                      |llm-options|
+9. Choosing a model                             |llm-choosing|
+
+==============================================================================
+1. Keys                                                            *llm-keys*
+
+                                                          *i_CTRL-X_CTRL-A*
+CTRL-X CTRL-A           Ask for the next word, phrase or line. The answer
+                        arrives as a popup menu with up to three entries,
+                        labelled `llm word`, `llm phrase` and `llm line`,
+                        which you take with CTRL-N/CTRL-P and CTRL-Y like
+                        any other completion menu. When the model thinks
+                        the line is finished and wants to start the next
+                        one, that next line is shown as ghost text instead
+                        (see below).
+
+                                                          *i_CTRL-X_CTRL-B*
+CTRL-X CTRL-B           Ask for a block, up to |g:llm_block_max_lines|. It
+                        is shown as ghost text at the cursor and on virtual
+                        lines below, appearing word by word as the model
+                        writes. The keys are the ones Vim's completion menu
+                        uses: CTRL-Y inserts what is shown, at any moment,
+                        even while it is still growing; CTRL-E throws it
+                        away, and so does typing or moving the cursor.
+
+Both are asynchronous: Vim stays usable while the model works, and asking
+again cancels the request in flight. The first request after Vim starts
+also starts the server and waits for it; see |llm-messages| for what you
+see meanwhile.
+
+The keys are `<Plug>(llm_complete)` and `<Plug>(llm_block)`; set
+|g:llm_no_mappings| and map them yourself to change them.
+
+==============================================================================
+2. What the model sees                                          *llm-context*
+
+Fill-in-the-middle models are given the text before the cursor, the text
+after it, and extra chunks:
+
+- up to |g:llm_prefix_lines| lines before the cursor;
+- a few lines after it: |g:llm_menu_suffix_lines| for the menu,
+  |g:llm_block_suffix_lines| for a block;
+- |g:llm_extra_chunk_lines|-line windows around your recent jump-list
+  positions and around the cursor in other loaded buffers of the same
+  filetype, at most |g:llm_extra_chunks| of them and |g:llm_extra_chars|
+  characters in all. This is how the model knows what you were just
+  looking at.
+
+For a model without fill-in-the-middle support (see |llm-models|), only the
+prefix and the extra chunks are sent, as a plain continuation prompt.
+
+==============================================================================
+3. Speed                                                          *llm-speed*
+
+A request costs prompt processing plus generation. The server keeps the
+processed prompt in a cache, so what matters is how much of the prompt
+changed since the last request:
+
+- The extra chunks come first and are sent in a fixed order, so they stay
+  cached even as you jump around; only newly visited places are added.
+- The prefix stays cached up to the line you are editing; typing on a line
+  costs that line again, nothing more.
+- The suffix comes after the edit point, so it is processed on every
+  request. That is why it is kept short.
+
+|:LlmWarm| does the prompt processing for a file up front. After it, a menu
+completion with the 3B model takes about half a second, most of it
+generating the dozen tokens of the answer; a block starts appearing after
+a quarter of a second and stops itself at |g:llm_block_max_lines|, so it
+never runs longer than it is useful. The 1.5B model is about twice as
+fast at both. Requests go over a raw channel, not a spawned process, so
+nothing is added on Vim's side. Use |:LlmStatus| to see what the last
+request cost.
+
+==============================================================================
+4. What it tells you                                           *llm-messages*
+
+Everything that happens in the background is reported on the command line
+so a wait is never silent:
+
+- while the server starts: what was started, how big the weights are, and
+  then once a second the elapsed time and the server's latest log line
+  (it is loading the weights onto the GPU);
+- when it is ready, and when a request you made during the wait runs;
+- while |:LlmWarm| primes the cache: how much context is being sent, then
+  how many tokens are cached and how long it took;
+- while a request runs longer than a moment: what it is doing and for how
+  long;
+- when a block arrives: how many lines, how long it took, and the keys;
+- when something goes wrong: the server exiting, a request the server
+  could not answer, or an error inside the plugin, each with the reason;
+  and when a request that waited for the server finds you have left
+  Insert mode meanwhile, so nothing can be shown.
+
+Milestones go through |:echomsg|, so |:messages| keeps them; the once-a-
+second progress lines replace each other and are not kept. |:LlmLog| has
+the server's own output and the milestones in full.
+
+Ghost text uses the highlight group `LlmGhost`, which links to
+`ComplMatchIns`, the group Vim uses for text that completion inserted, so
+the two look the same. The custom colorscheme makes both light blue.
+
+==============================================================================
+5. The server                                                    *llm-server*
+
+The plugin drives llama.cpp's `llama-server`, found on $PATH, in the
+winget package directory, or at |g:llm_server|. It is started with the
+current model, all layers on the GPU, an 8k context, flash attention and
+prompt-cache reuse, bound to 127.0.0.1:|g:llm_port|, no web UI.
+
+Lifecycle:
+- Never started at Vim startup.
+- Started on the first completion, or by |:LlmWarm| or |:LlmStart|;
+  requests made while it loads wait and run when it is ready.
+- Kept running across requests and idle time, so repeated use stays fast.
+- Stopped when Vim exits. Vim kills the whole process tree, and the
+  server is additionally wrapped in a watchdog (PowerShell on Windows,
+  sh elsewhere) that kills it if Vim disappears without exiting, so a
+  crash does not leave it behind.
+- If a llama-server already answers on the port when the first request
+  is made, it is used and left alone at exit.
+
+Two Vims at once ~                                               *llm-sharing*
+They share one server; two would not fit on a 6 GB card and would fight
+for the port. Whichever Vim asks first starts it, the other finds it
+(waiting for it if it is still loading) and uses it. The server has one
+prompt cache, so the first request after switching from one Vim to the
+other re-processes that document's context, about a second, and the
+following ones are quick again; |g:llm_slots| can give each Vim its own
+cache. When the Vim that started the server exits, the server goes with
+it; the other Vim notices on its next request, starts its own, and runs
+that request when it is up. You see each of these steps on the command
+line.
+
+The winget build uses Vulkan, which runs on NVIDIA and AMD alike, so the
+same setup works on both of your machines. `curl` is needed only for
+|:LlmDownload|.
+
+==============================================================================
+6. Models and weights                                            *llm-models*
+
+models/registry.txt lists the models the plugin knows: a short name, the
+Hugging Face repository, the file name, whether it supports
+fill-in-the-middle, and a note on size. The weights themselves are not
+tracked. The plugin looks for a registry file in models/, then in
+llama.cpp's own download cache, then in |g:llm_model_dirs|.
+
+The current model is |g:llm_model|; the default is qwen2.5-coder-3b.
+
+==============================================================================
+7. Commands                                                    *llm-commands*
+
+                                                                   *:LlmWarm*
+:LlmWarm                Warm up: start the server if it is not running, then
+                        send the context around the cursor through the model
+                        with a one-token answer, so the prompt cache already
+                        holds this file when the first real completion
+                        comes. Reports how many context tokens are ready.
+                        Run it when you open a file you are about to work
+                        in; it does not change the buffer.
+                                                                  *:LlmStart*
+:LlmStart               Start the server now instead of on first use,
+                        without priming it.
+                                                                   *:LlmStop*
+:LlmStop                Stop it (only if this Vim started it).
+                                                                 *:LlmStatus*
+:LlmStatus              State, model, weights path, server path, and what
+                        the last request cost: prompt tokens processed and
+                        reused from the cache, tokens generated and at what
+                        rate, and the total time.
+                                                                    *:LlmLog*
+:LlmLog                 The server's output in a scratch window; look here
+                        when it fails to start.
+                                                                  *:LlmModel*
+:LlmModel [name]        Show or set the model. Changing it stops a running
+                        server; the next completion starts the new one.
+                                                                 *:LlmModels*
+:LlmModels              The registry with a present/missing column.
+                                                               *:LlmDownload*
+:LlmDownload {name}     Fetch the weights for a registry entry into
+                        models/ in the background.
+
+==============================================================================
+8. Options                                                      *llm-options*
+
+                                                                *g:llm_model*
+g:llm_model             Registry name or a path to a .gguf. Default
+                        `qwen2.5-coder-3b`.
+                                                               *g:llm_server*
+g:llm_server            Path to llama-server when it is not on $PATH.
+                                                                 *g:llm_port*
+g:llm_port              Default 8797.
+                                                                  *g:llm_ctx*
+g:llm_ctx               Context size in tokens per slot. Default 8192.
+                                                                *g:llm_slots*
+g:llm_slots             Slots, that is prompt caches, the server is
+                        started with; default 1. Set it to the number of
+                        Vims sharing the server to keep each one's
+                        document warm (|llm-sharing|); the total context
+                        is |g:llm_ctx| times this, and with two slots
+                        single requests occasionally stalled for seconds
+                        in testing.
+                                                           *g:llm_gpu_layers*
+g:llm_gpu_layers        Layers to keep on the GPU. Default 99 (all).
+                                                          *g:llm_server_args*
+g:llm_server_args       Extra llama-server arguments, as a list.
+                                                           *g:llm_model_dirs*
+g:llm_model_dirs        Extra directories searched for weights.
+                                                         *g:llm_prefix_lines*
+                                                         *g:llm_prefix_chars*
+g:llm_prefix_lines      Lines before the cursor sent as prefix (200), and
+g:llm_prefix_chars      the most characters of them (12000): a file of
+                        paragraph-long lines is capped by the latter.
+                                                    *g:llm_menu_suffix_lines*
+                                                   *g:llm_block_suffix_lines*
+                                                         *g:llm_suffix_chars*
+g:llm_menu_suffix_lines Lines after the cursor sent as suffix for the
+g:llm_block_suffix_lines  menu (8) and for a block (30), at most
+g:llm_suffix_chars      2000 characters. Every one of them is processed
+                        again on each request.
+
+Only these lines are ever read, so the size of the file makes no
+difference, and the server trims a prompt that still exceeds its context
+rather than failing.
+                                                          *g:llm_extra_chars*
+                                                    *g:llm_extra_chunk_lines*
+                                                         *g:llm_extra_chunks*
+g:llm_extra_chars       Budget for extra chunks (6000 characters), the
+g:llm_extra_chunk_lines size of each (30 lines) and how many at most (6).
+g:llm_extra_chunks
+                                                          *g:llm_menu_tokens*
+                                                              *g:llm_menu_ms*
+g:llm_menu_tokens       Tokens generated for the menu (12): a few words,
+g:llm_menu_ms           of which only the first line is used. The time
+                        limit on that generation, default 1500 ms.
+                                                         *g:llm_block_tokens*
+                                                      *g:llm_block_max_lines*
+g:llm_block_tokens      Tokens a block may take (64) and the most lines it
+g:llm_block_max_lines   may have (8); generation stops as soon as either
+                        is reached.
+                                                          *g:llm_temperature*
+                                                       *g:llm_repeat_penalty*
+g:llm_temperature       Sampling temperature, default 0.1: predictable.
+g:llm_repeat_penalty    Penalty on repeating recent tokens, default 1.1;
+                        small models loop without it. A block is also cut
+                        where it repeats the previous line or starts
+                        reproducing the text after the cursor.
+                                                            *g:llm_prompt_ms*
+                                                           *g:llm_predict_ms*
+g:llm_prompt_ms         Time limit on prompt processing; -1 (default) means
+                        none, so the context is never silently truncated.
+g:llm_predict_ms        Time limit on generation, default 4000: a long
+                        suggestion is cut short rather than late.
+                                                              *g:llm_timeout*
+g:llm_timeout           Seconds before a request is given up, default 90.
+
+A single menu suggestion is inserted straight away rather than shown,
+because 'completeopt' lacks `menuone`; add it to always see the menu.
+                                                          *g:llm_no_mappings*
+g:llm_no_mappings       Set to 1 to define your own keys.
+
+==============================================================================
+9. Choosing a model                                            *llm-choosing*
+
+One model serves all languages: the Qwen2.5-Coder family is trained for
+fill-in-the-middle across most programming languages, and handles LaTeX,
+Typst and English prose acceptably. Language-specific models are not worth
+their disk space for this use.
+
+Size is a memory decision. A model needs about its file size in VRAM plus
+roughly 1 GB for an 8k context. On the 6 GB laptop GPU the 3B model fits
+and is quick; the 7B spills into system memory and slows down. On a card
+with 12 GB or more, the 7B is a clear step up in block quality. The 1.5B
+model is the one to use when latency matters more than quality: it
+generates about twice as fast as the 3B.
+
+For prose-heavy work, qwen3-4b is listed as a general model; it lacks
+fill-in-the-middle, so it only continues what is before the cursor.
+
+ vim:tw=78:ts=8:ft=help:norl:

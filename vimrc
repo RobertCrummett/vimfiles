@@ -27,7 +27,7 @@ endif
 
 set timeout timeoutlen=3000 ttimeoutlen=100
 
-colorscheme quiet
+colorscheme custom
 
 augroup colorscheme_modifications
   au!
@@ -37,22 +37,7 @@ augroup colorscheme_modifications
   " color scheme evening
   au Colorscheme evening highlight Normal ctermbg=0 guibg=#000000
   au Colorscheme evening highlight EndOfBuffer ctermfg=153 ctermbg=0 guifg=#add8e6 guibg=#000000
-
-  " color scheme quiet
-  au Colorscheme quiet highlight helpHyperTextJump guifg=#ff00af
-  au Colorscheme quiet highlight helpHyperTextEntry guifg=#aa9fff
-  au Colorscheme quiet highlight helpOption guifg=#ff9fff
 augroup END
-
-augroup colorscheme_comments
-  autocmd!
-  autocmd ColorScheme * highlight clear Todo
-  autocmd ColorScheme * highlight link Todo Comment
-augroup END
-
-" Apply clean comments immediately (in case the colorscheme is already loaded)
-highlight clear Todo
-highlight link Todo Comment
 
 " This check is inserted in case that someone (me) sets a color scheme before
 " the colorscheme_modifications apply. So this conditional ensures that the
@@ -112,6 +97,15 @@ let g:loaded_netrwPlugin=1
 " NOTE This works on Win32, in the gui editor. So it seems to be a problem with
 " vim from the terminal in Win32 only.
 set complete-=i foldmethod=manual
+
+" Synonyms with CTRL-X CTRL-T (autoload/thesaurus.vim, see README).
+set thesaurusfunc=thesaurus#complete
+
+" Spell check against English plus the geophysics dictionary (:help geospell).
+set spelllang=en_us,geophysics
+
+" Keep the help tags for the local plugins (doc/*.txt) up to date.
+silent! execute 'helptags' fnameescape(expand('<sfile>:p:h') . '/doc')
 
 if executable('rg')
   set grepformat+=%f:%l:%c:%m grepprg=rg\ --vimgrep\ -uu
@@ -181,13 +175,6 @@ endif
 " augroup END
 
 let maplocalleader = "\\"
-
-function! SynStack()
-  if !exists("*synstack")
-    return
-  endif
-  echo map(synstack(line('.'), col('.')), 'synIDattr(v:val, "name")')
-endfunc
 
 " function! LispColorscheme()
 "   colorscheme quiet

@@ -1,0 +1,85 @@
+*comments.txt*   Toggle line comments with gc                    *comments-plugin*
+
+                                                *comments* *plugin-comments*
+Toggle line comments on any range with a single operator. Lives in
+plugin/comments.vim.
+
+1. Mappings                                     |comments-mappings|
+2. Which comment leader is used                 |comments-leader|
+3. How lines are toggled                        |comments-toggle|
+4. Options                                      |comments-options|
+
+==============================================================================
+1. Mappings                                                *comments-mappings*
+
+                                                                *comments-gc*
+gc{motion}              Toggle comments on the lines covered by {motion}.
+                        Always linewise: `gcip` comments a paragraph, `gcj`
+                        this line and the next.
+
+                                                               *comments-gcc*
+[count]gcc              Toggle comments on [count] lines starting with the
+                        current one.
+
+                                                            *comments-v_gc*
+{Visual}gc              Toggle comments on the selected lines (any Visual
+                        mode; always linewise).
+
+All three go through |g@|, so `.` repeats the last toggle over the same
+number of lines, counts work, macros replay them, and no register is
+touched.
+
+==============================================================================
+2. Which comment leader is used                              *comments-leader*
+
+The leader is looked up in this order:
+
+1. |b:comment_leader| if the buffer sets it.
+2. |g:comment_map| entry for the 'filetype'. A dotted filetype such as
+   `c.doxygen` is tried one component at a time.
+3. 'commentstring', but only when it describes a line comment, i.e. the
+   `%s` is at the end, like `// %s` or `-- %s`.
+
+Filetypes whose only comment syntax is a block (css, html, xml, markdown,
+ocaml) fall through all three and the plugin says so instead of guessing.
+
+The map ships with leaders for about 140 filetypes, grouped by leader:
+`//` for the C family, Rust, Go, Java, JavaScript, PHP, shader languages,
+Typst and others; `#` for Python, shells, PowerShell, Perl, Ruby, R, Julia,
+YAML, TOML, make, cmake, Dockerfiles and most config files; `--` for Lua,
+Haskell, SQL, Ada, Elm; `%` for MATLAB, Octave, TeX, Erlang, Prolog; `;;`
+for Racket, Scheme, Lisp, Clojure, Fennel; `;` for ini and assemblers; `"`
+for Vim script; `'` for BASIC dialects; `!` for Fortran; `REM` for batch.
+
+==============================================================================
+3. How lines are toggled                                     *comments-toggle*
+
+Blank and whitespace-only lines are never touched.
+
+The range is uncommented only when every non-blank line in it already starts
+with the leader; otherwise every non-blank line is commented. This makes a
+toggle followed by another toggle always return to the original text, even
+for a block that mixed commented and uncommented lines.
+
+When commenting, the leader is placed at the shallowest indentation found in
+the range, so a commented block lines up. A line indented less than that
+keeps its own indentation. A single space follows the leader, and that one
+space is removed again when uncommenting.
+
+The cursor and scroll position are restored afterwards.
+
+==============================================================================
+4. Options                                                  *comments-options*
+
+                                                              *g:comment_map*
+g:comment_map           Dictionary of 'filetype' to leader string. Entries
+                        you define in the vimrc before the plugin loads are
+                        merged with the defaults and win over them: >
+                            let g:comment_map = {'go': '//', 'ron': '//'}
+<
+                                                           *b:comment_leader*
+b:comment_leader        Per-buffer override, useful from an ftplugin or a
+                        modeline-driven autocommand: >
+                            let b:comment_leader = '##'
+<
+ vim:tw=78:ts=8:ft=help:norl:

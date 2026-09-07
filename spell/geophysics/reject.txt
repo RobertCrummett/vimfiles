@@ -1,0 +1,41 @@
+# Words that must never enter the dictionary. One per line; # comments.
+# :GeoSpellRemove appends here, and harvests skip anything listed.
+# See :help geospell.
+
+# Misspellings seen in the sources
+Artifical
+Asunci
+attr
+baumeisterleitao
+Bibcode
+booktitle
+cgemblue
+colspan
+DOIs
+eqn
+FirstColor
+frac
+Gro
+hline
+ilization
+JPEGs
+keepaspectratio
+Lapacian
+linabighianoldenburg
+lineno
+penduluos
+proddesc
+reflow
+rowspan
+scatt
+SecondColor
+subfigure
+textblock
+tikzpicture
+tocline
+tocpg
+truein
+tztal
+valign
+vline
+Wayback

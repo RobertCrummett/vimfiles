@@ -1,0 +1,127 @@
+*diredit.txt*   Edit a directory listing as text              *diredit-plugin*
+
+                                                  *diredit* *plugin-diredit*
+A directory is shown as a text buffer, one entry per line. Edit the text
+with ordinary Vim commands, then |:w| applies the changes to the file
+system. Lives in plugin/diredit.vim and autoload/diredit.vim.
+
+1. Opening a listing                            |diredit-open|
+2. The listing                                  |diredit-listing|
+3. Editing: what each edit means                |diredit-editing|
+4. Writing: plan, checks and errors             |diredit-write|
+5. Mappings in a listing                        |diredit-mappings|
+6. Options                                      |diredit-options|
+
+==============================================================================
+1. Opening a listing                                            *diredit-open*
+
+                                                             *:Ex* *:Explore*
+:Ex [dir]               Open a listing of [dir], or of the current file's
+:Explore [dir]          directory, or of the current directory when the
+                        buffer has no file. From inside a listing, `:Ex`
+                        with no argument opens the parent.
+
+                                                                  *diredit--*
+-                       In any buffer: open the parent directory of the
+                        current file, with the cursor on that file. Only
+                        mapped when `-` is free.
+
+Editing a directory path directly, as in `:e .` or starting Vim with a
+directory argument, also opens a listing. The buffer is named
+`diredit://{path}`, so `:e diredit://C:/some/dir` works too.
+
+==============================================================================
+2. The listing                                               *diredit-listing*
+
+Entries are sorted directories first, then case-insensitively by name.
+Directories end in `/`. With |g:diredit_details| on, each line shows a
+details column before the name: >
+
+    2026-09-06 12:54   <DIR>  sub dir/
+    2026-09-06 12:54    5.0M  large.bin
+    2026-09-06 12:54       1  tiny.txt
+<
+Sizes are human readable: bytes below 1K, one decimal up to 9.9, whole
+units above. Directories show `<DIR>`, symbolic links `<LNK>`. On Unix a
+permissions column such as `-rw-r--r--` comes first.
+
+Each line really holds three tab-separated fields: a numeric id, the
+details, and the name. The id and the tabs are concealed. The id is how
+edits are recognised, so leave it alone; if a line loses it, reload with
+`:e!`. Only the first and last fields matter when writing.
+
+==============================================================================
+3. Editing: what each edit means                             *diredit-editing*
+
+Rename         Change the name.
+Delete         Delete the line, for example with `dd`. Directories are
+               removed recursively.
+Copy           Duplicate the line (`yy` then `p`) and give the copy a new
+               name. Directories are copied recursively.
+Move           Write a relative path such as `sub/name.txt`, or an absolute
+               path. Missing parent directories are created. Or delete the
+               line here and paste it into another listing: the id travels
+               with the line, and the move happens when the receiving
+               listing is written. Writing the source listing first does
+               not delete the entry while it is visible elsewhere.
+Create         Add a line with no id, i.e. just type a name. End it with
+               `/` to create a directory. `deep/x/y.txt` creates the
+               intermediate directories.
+
+Blank lines are ignored. The details field can be deleted or mangled
+without effect. `.` repeats edits, and yank/put go through the registers,
+so macros and counts work as they do in any buffer.
+
+==============================================================================
+4. Writing: plan, checks and errors                            *diredit-write*
+
+|:w| turns the edited text into a plan of DELETE, MOVE, COPY and CREATE
+operations, checks it, shows it, and asks for confirmation unless
+|g:diredit_confirm| is 0.
+
+Checks that abort the write, each reported with its line number:
+- a destination used twice
+- a destination that already exists on disk and is not itself being moved
+  away or deleted by the same write
+- names containing `.` or `..` components
+- on Windows, names containing `< > : " | ? *`
+- moving or copying a directory into itself
+- an id the plugin does not know (stale or mangled line)
+
+Nothing is applied when a check fails; the buffer stays modified so the
+lines can be fixed.
+
+Order of application: deletions first, then moves and copies in whatever
+order leaves their destinations free (a swap of two names goes through a
+temporary name), then creations. A move that fails with |rename()| falls
+back to copy and delete. Afterwards the listing is re-read, a summary such
+as `diredit: 2 moved, 1 deleted` is echoed, and any failure is listed with
+its reason. Messages are kept in |:messages|.
+
+Leaving a listing with unsaved edits behaves like any modified buffer.
+Re-entering an unmodified listing re-reads the directory.
+
+==============================================================================
+5. Mappings in a listing                                    *diredit-mappings*
+
+<CR>            Open the entry under the cursor: a file is edited, a
+                directory replaces the listing.
+-               Parent directory, cursor on the directory you came from.
+R               Reload from disk (same as `:e!`).
+g.              Toggle dotfiles.
+gl              Toggle the details column.
+g?              Show this key summary.
+
+==============================================================================
+6. Options                                                   *diredit-options*
+
+                                                          *g:diredit_confirm*
+g:diredit_confirm       Ask before applying a plan. Default 1.
+
+                                                      *g:diredit_show_hidden*
+g:diredit_show_hidden   Show dotfiles. Default 1.
+
+                                                          *g:diredit_details*
+g:diredit_details       Show the details column. Default 1.
+
+ vim:tw=78:ts=8:ft=help:norl:

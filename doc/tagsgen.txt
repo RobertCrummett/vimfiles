@@ -1,0 +1,106 @@
+*tagsgen.txt*   Write a tags file with Vim alone                *tagsgen-plugin*
+
+                                                  *tagsgen* *plugin-tagsgen*
+Generates a |tags| file by scanning a directory tree with regular
+expressions, no ctags needed. Lives in plugin/tagsgen.vim and
+autoload/tagsgen.vim.
+
+1. Command                                      |tagsgen-command|
+2. What is found                                |tagsgen-languages|
+3. Adding a language or pattern                 |tagsgen-extend|
+4. Options                                      |tagsgen-options|
+5. Limits                                       |tagsgen-limits|
+
+==============================================================================
+1. Command                                                   *tagsgen-command*
+
+                                                                  *:MakeTags*
+:MakeTags [dir]         Scan [dir] (default: the current directory)
+                        recursively and write [dir]/tags. Reports the number
+                        of tags, files and seconds. Completes directory
+                        names.
+
+The file is a standard sorted tags file with the format and sorted-flag
+headers, so |:tag|, |CTRL-]|, |:tselect|, |taglist()| and everything else
+that reads 'tags' works. Entries use the search-pattern form
+`/^line text$/`, which keeps working after lines shift; each also carries a
+kind and a `line:` field.
+
+==============================================================================
+2. What is found                                           *tagsgen-languages*
+
+Extensions map to filetypes, and each filetype has a list of patterns.
+Kinds follow ctags: f function, c class, s struct/enum/union/trait,
+t typedef, d macro, v variable, m user command or macro, l label,
+a autocommand group, h heading.
+
+  C, C++          #define, struct/union/enum/class, typedef, function
+                  definitions (including the style with the return type on
+                  the previous line and the name at column 0)
+  Rust            fn, struct/enum/union/trait/type/mod, const/static,
+                  macro_rules!
+  Python          def, class, module-level assignments
+  Go              func (methods too), type
+  JavaScript/TS   function, class, const/let/var
+  Lua             function, name = function
+  Vim script      function/def, :command, augroup, global variables
+  Shell           name() and function name
+  PowerShell      function/filter/workflow, class
+  Batch           :labels
+  MATLAB/Octave   function, classdef
+  Scheme/Racket   define, define-syntax, define-record-type, struct
+  Lisp            defun/defmacro/defgeneric/defmethod, defvar/defparameter,
+                  defstruct/defclass
+  Typst           #let functions and values, <labels>
+  TeX             \label, \newcommand, \newenvironment
+  Markdown        headings
+
+==============================================================================
+3. Adding a language or pattern                               *tagsgen-extend*
+
+Set the options below in the vimrc before the plugin loads; your entries
+are merged with the defaults and win over them. A pattern must isolate the
+tag name with |/\zs| and |/\ze|. An optional third element is a plain
+substring the line must contain, a cheap prefilter for expensive patterns: >
+
+    let g:tagsgen_filetypes = {'zig': 'zig'}
+    let g:tagsgen_patterns = {
+      \ 'zig': [['^\s*\%(pub\s\+\)\?fn\s\+\zs\h\w*', 'f', 'fn']],
+      \ }
+<
+==============================================================================
+4. Options                                                   *tagsgen-options*
+
+                                                        *g:tagsgen_filetypes*
+g:tagsgen_filetypes     Dictionary: lowercase extension to filetype.
+
+                                                         *g:tagsgen_patterns*
+g:tagsgen_patterns      Dictionary: filetype to a list of
+                        [pattern, kind] or [pattern, kind, needle].
+                        The first pattern in the list that matches a line
+                        owns that line.
+
+                                                             *g:tagsgen_skip*
+g:tagsgen_skip          Dictionary: filetype to a pattern for lines to
+                        ignore entirely (comment lines, by default, for the
+                        C family, Rust, Go and JavaScript).
+
+                                                          *g:tagsgen_exclude*
+g:tagsgen_exclude       List of directory names never descended into.
+                        Default: .git .hg .svn node_modules target build
+                        __pycache__ .cache
+
+                                                         *g:tagsgen_max_size*
+g:tagsgen_max_size      Files larger than this many bytes are skipped.
+                        Default 2 MiB.
+
+==============================================================================
+5. Limits                                                     *tagsgen-limits*
+
+This is regular-expression tagging. There is no parser, so no scopes,
+overload resolution or nested definitions, and a line that looks like a
+definition is tagged even when it is not one. For jumping to definitions in
+your own code it is enough; for library-scale accuracy, ctags is still the
+better tool. Speed is roughly a second per hundred thousand lines.
+
+ vim:tw=78:ts=8:ft=help:norl:

@@ -1,0 +1,13 @@
+# Model registry for the llm plugin (:help llm-models).
+#
+# Weights are not tracked. :LlmDownload {name} fetches a file from
+# https://huggingface.co/{repo}/resolve/main/{file} into this directory;
+# the plugin also finds files already downloaded by llama.cpp itself
+# (llama-server -hf ...) in its cache directory.
+#
+# name              repo                                     file                            fim  notes
+qwen2.5-coder-1.5b  ggml-org/Qwen2.5-Coder-1.5B-Q8_0-GGUF   qwen2.5-coder-1.5b-q8_0.gguf   yes  1.6 GB. Fastest; fine for word and line completion.
+qwen2.5-coder-3b    ggml-org/Qwen2.5-Coder-3B-Q8_0-GGUF     qwen2.5-coder-3b-q8_0.gguf     yes  3.3 GB. Default on a 6 GB GPU; good block completion.
+qwen2.5-coder-7b    ggml-org/Qwen2.5-Coder-7B-Q8_0-GGUF     qwen2.5-coder-7b-q8_0.gguf     yes  8.1 GB. Needs about 10 GB of VRAM to stay fast.
+qwen2.5-coder-14b   ggml-org/Qwen2.5-Coder-14B-Q8_0-GGUF    qwen2.5-coder-14b-q8_0.gguf    yes  16 GB. Workstation GPUs only.
+qwen3-4b            ggml-org/Qwen3-4B-GGUF                  Qwen3-4B-Q8_0.gguf              no   4.3 GB. General model for prose; no fill-in-the-middle, so the text after the cursor is ignored.
