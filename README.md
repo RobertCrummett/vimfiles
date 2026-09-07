@@ -93,3 +93,19 @@ startup, and stopping it when Vim exits or crashes. The model sees the text
 around the cursor plus chunks from recent jump-list positions and sibling
 buffers. Weights live in `models/` (untracked); `models/registry.txt` records
 where each comes from and `:LlmDownload {name}` fetches them. See `:help llm`.
+
+`:LlmModels` lists the registry with a present/missing column, and
+`:LlmModel {name}` switches models for the rest of the session, with tab
+completion over the registry names. Measurements behind the current choices
+are in `models/BENCHMARKS.md`.
+
+Because the right model depends on the GPU, the default is set per machine
+rather than in the vimrc. Put the choice in `after/plugin/local.vim`, which
+is ignored by git and so stays on the machine that needs it:
+
+    let g:llm_model = 'qwen2.5-coder-7b-q4'
+
+`after/plugin` is sourced at startup after the plugins, and the llm plugin
+reads `g:llm_model` when a completion is requested rather than at startup, so
+setting it there is enough. Anything else machine-specific belongs in the
+same file.

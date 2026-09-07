@@ -1,0 +1,39 @@
+# Generated or downloaded files. Everything here is rebuilt or refetched, so
+# none of it belongs in the history. Paths are anchored with a leading slash so
+# they apply to this repository only and not to the bundled plugins under
+# pack/, which carry their own ignore rules.
+
+# Help tags, rebuilt from doc/*.txt on every startup by the vimrc.
+/doc/tags
+
+# Compiled spelling dictionary, rebuilt by plugin/geospell.vim whenever
+# spell/geophysics/words.txt or reject.txt changes. The word lists themselves
+# are tracked; only the binary output is not.
+/spell/*.spl
+/spell/*.sug
+
+# Corpus for building the geophysics word list, refreshed by fetch-corpus.py.
+/spell/geophysics/corpus/
+
+# Model weights. Gigabytes each; models/registry.txt records where every one
+# comes from and :LlmDownload {name} fetches them again.
+/models/*.gguf
+
+# Moby Thesaurus II, about 24 MB. See the Thesaurus section of README.md.
+/thesaurus/
+
+# Per-machine settings that must not follow the repository to another machine,
+# such as which model this GPU should default to. See README.md.
+/after/plugin/local.vim
+
+# Tag files written by :MakeTags.
+/tags
+/*/tags
+
+# netrw's directory history, written even though netrw is disabled.
+.netrwhist
+
+# Vim leftovers.
+*.swp
+*.swo
+*~

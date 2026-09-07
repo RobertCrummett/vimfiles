@@ -5,9 +5,17 @@
 # the plugin also finds files already downloaded by llama.cpp itself
 # (llama-server -hf ...) in its cache directory.
 #
-# name              repo                                     file                            fim  notes
-qwen2.5-coder-1.5b  ggml-org/Qwen2.5-Coder-1.5B-Q8_0-GGUF   qwen2.5-coder-1.5b-q8_0.gguf   yes  1.6 GB. Fastest; fine for word and line completion.
-qwen2.5-coder-3b    ggml-org/Qwen2.5-Coder-3B-Q8_0-GGUF     qwen2.5-coder-3b-q8_0.gguf     yes  3.3 GB. Default on a 6 GB GPU; good block completion.
-qwen2.5-coder-7b    ggml-org/Qwen2.5-Coder-7B-Q8_0-GGUF     qwen2.5-coder-7b-q8_0.gguf     yes  8.1 GB. Needs about 10 GB of VRAM to stay fast.
-qwen2.5-coder-14b   ggml-org/Qwen2.5-Coder-14B-Q8_0-GGUF    qwen2.5-coder-14b-q8_0.gguf    yes  16 GB. Workstation GPUs only.
-qwen3-4b            ggml-org/Qwen3-4B-GGUF                  Qwen3-4B-Q8_0.gguf              no   4.3 GB. General model for prose; no fill-in-the-middle, so the text after the cursor is ignored.
+# Q8_0 and Q4_K_M entries both appear below. Measurements on this hardware put
+# them level: on 99 completions from this repo the 7B answered identically at
+# both quantizations, while Q4_K_M is half the size and 55% faster. Prefer the
+# -q4 rows unless something here is shown to need the extra precision. See
+# BENCHMARKS.md in this directory.
+#
+# name                repo                                     file                            fim  notes
+qwen2.5-coder-1.5b    ggml-org/Qwen2.5-Coder-1.5B-Q8_0-GGUF   qwen2.5-coder-1.5b-q8_0.gguf   yes  1.6 GB. Fastest; fine for word and line completion.
+qwen2.5-coder-3b      ggml-org/Qwen2.5-Coder-3B-Q8_0-GGUF     qwen2.5-coder-3b-q8_0.gguf     yes  3.3 GB. Plugin default. Weakest of the tested set; 34% exact against 42% for the 7B.
+qwen2.5-coder-7b      ggml-org/Qwen2.5-Coder-7B-Q8_0-GGUF     qwen2.5-coder-7b-q8_0.gguf     yes  8.1 GB. Same answers as the -q4 row below at 64% of its speed; kept for reference.
+qwen2.5-coder-7b-q4   QuantFactory/Qwen2.5-Coder-7B-GGUF      Qwen2.5-Coder-7B.Q4_K_M.gguf   yes  4.7 GB. Best for code: 42% exact, 116 tok/s, 3.6 s to load. The pick for a 16 GB card.
+qwen2.5-coder-14b-q4  bartowski/Qwen2.5-Coder-14B-GGUF        Qwen2.5-Coder-14B-Q4_K_M.gguf  yes  9.0 GB. Best domain knowledge: 7/8 geophysics facts against 2/8 for the 7B. Slower, 62 tok/s. Use it for papers.
+qwen2.5-coder-14b     ggml-org/Qwen2.5-Coder-14B-Q8_0-GGUF    qwen2.5-coder-14b-q8_0.gguf    yes  16 GB. Does not fit a 16 GB card once context is added; use the -q4 row instead.
+qwen3-4b              ggml-org/Qwen3-4B-GGUF                  Qwen3-4B-Q8_0.gguf              no   4.3 GB. General model for prose; no fill-in-the-middle, so the text after the cursor is ignored. Tested worse than the coders even on prose.
