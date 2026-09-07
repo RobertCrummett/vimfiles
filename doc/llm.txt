@@ -215,6 +215,14 @@ g:llm_slots             Slots, that is prompt caches, the server is
                         is |g:llm_ctx| times this, and with two slots
                         single requests occasionally stalled for seconds
                         in testing.
+                                                          *g:llm_kv_unified*
+g:llm_kv_unified        Pass -kvu to llama-server; default 1. Without it a
+                        recent server chooses four slots by itself and
+                        ignores |g:llm_slots|, and a request that lands on
+                        a different slot than the last one has its prompt
+                        reprocessed. The flag turns that automatic choice
+                        off, not unified KV, and costs no memory. Set it to
+                        0 for a llama-server too old to know the flag.
                                                            *g:llm_gpu_layers*
 g:llm_gpu_layers        Layers to keep on the GPU. Default 99 (all).
                                                           *g:llm_server_args*

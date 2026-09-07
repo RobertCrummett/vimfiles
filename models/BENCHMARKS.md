@@ -172,3 +172,52 @@ or unplugging, and `:LlmModel` overrides either.
 `qwen2.5-coder-7b-q4` is worth keeping for a session where the answer matters
 more than the wait -- it had the best point estimate on all four accuracy
 measures and the best hard tier -- but not as a default at 1.4 s a completion.
+
+## Choosing settings on a new machine
+
+What belongs where: anything true of llama.cpp or of the plugin is tracked and
+needs no per-machine decision, and anything true of one box is not. The model
+choice, the VRAM budget and the power behaviour are per-machine, so they live
+in `after/plugin/local.vim`, which `.gitignore` keeps out of the repository.
+The server arguments are not per-machine and live in `s:server_cmd()`.
+
+To repeat this on another box:
+
+1. **Find the usable VRAM, which is not what the card advertises.** Start
+   llama-server on anything and read the line `using device Vulkan0 (...) - N
+   MiB free`. That N is the budget. A model needs its weights plus the KV
+   cache plus a compute buffer: at 8k context the 7B needs 4168 + 448 + 304
+   MiB. Over the budget it does not degrade, it fails -- llama-server exits
+   with `ErrorOutOfDeviceMemory`.
+
+2. **On a laptop, find out what the power modes do.** `nvidia-smi
+   --query-gpu=clocks.sm,power.draw,enforced.power.limit,temperature.gpu` under
+   load, once on AC and once on battery. If the two differ much, every latency
+   below has to be quoted per mode, and models have to be timed round-robin
+   rather than one after another. On a desktop this step is nothing.
+
+3. **Score accuracy once; it does not depend on the clock.** Mask the tail of
+   ~100 real lines from this repo, send the prefix and suffix `s:context()`
+   builds, and compare the first line of the answer. Use paired McNemar
+   between models rather than eyeballing the percentages: on the laptop the
+   7B beat the 1.5B decisively and the 3B not at all, which is not what the
+   raw numbers suggest.
+
+4. **Time the candidates in both of the plugin's modes,** `<C-X><C-A>` at 12
+   tokens and `<C-X><C-B>` at 64. Menu latency is the one that decides whether
+   a completion is worth waiting for.
+
+5. **Pick the largest model that stays fast enough, not the most accurate
+   one.** Take a bigger model only when a paired test says it is actually
+   better. Put the answer in `after/plugin/local.vim` as `g:llm_model`, and
+   set `g:llm_model_ac` / `g:llm_model_battery` there too if the machine has
+   a power split worth following.
+
+6. **Check the server came up the way you asked**: `curl -s
+   127.0.0.1:8797/slots` should return as many entries as `g:llm_slots` asks
+   for. If it returns four when you asked for one, the build is overriding
+   `-np` and `g:llm_kv_unified` is not doing its job.
+
+The AMD figures above were taken before `-kvu` was added. If that build also
+chose four slots for itself, its request times were measured without the
+prompt cache the plugin now keeps, and would come out a little better today.

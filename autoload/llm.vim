@@ -258,12 +258,28 @@ endfunction
 " single Vim sometimes stalled for seconds when the server ran two
 " sequences in one batch, and re-warming after switching Vims costs about
 " a second.
+"
+" -kvu is what makes -np stick. Without it a recent llama-server announces
+" "setting n_parallel = 4 and kv_unified = true (add -kvu to disable this)"
+" and ignores the -np we asked for; the flag turns that automatic choice
+" off rather than turning unified KV off, which is what the wording sounds
+" like. It costs nothing -- the KV buffer is the same size either way --
+" and it is worth having, because with four slots the server picks a slot
+" per request and a request that lands on a different one reprocesses the
+" prompt. Walking a cursor through autoload/llm.vim, one slot reprocessed
+" 36% fewer prompt tokens than four, and 41% fewer while typing in place.
+" Set g:llm_kv_unified to 0 for a llama-server too old to know the flag,
+" which would otherwise refuse to start.
 function! s:server_cmd(exe, model) abort
   let l:slots = max([1, s:opt('slots', 1)])
-  return [a:exe, '-m', a:model, '--host', '127.0.0.1', '--port', string(s:port()),
+  let l:cmd = [a:exe, '-m', a:model, '--host', '127.0.0.1', '--port', string(s:port()),
     \ '-ngl', string(s:opt('gpu_layers', 99)),
     \ '-c', string(s:opt('ctx', 8192) * l:slots), '-np', string(l:slots),
-    \ '-fa', 'on', '--cache-reuse', '256', '--no-webui'] + s:opt('server_args', [])
+    \ '-fa', 'on', '--cache-reuse', '256', '--no-webui']
+  if s:opt('kv_unified', 1)
+    call add(l:cmd, '-kvu')
+  endif
+  return l:cmd + s:opt('server_args', [])
 endfunction
 
 " ---------------------------------------------------------- http client
