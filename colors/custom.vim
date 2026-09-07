@@ -114,6 +114,12 @@ function! s:Accents() abort
   hi! link markdownH4            customLavendar
   hi! link markdownH5            customLavendar
   hi! link markdownH6            customLavendar
+  hi! link markdownH1Delimiter   customLavendar
+  hi! link markdownH2Delimiter   customLavendar
+  hi! link markdownH3Delimiter   customLavendar
+  hi! link markdownH4Delimiter   customLavendar
+  hi! link markdownH5Delimiter   customLavendar
+  hi! link markdownH6Delimiter   customLavendar
   hi! link markdownLinkText      customPink
   hi! link markdownId            customPink
   hi! link markdownIdDeclaration customPink

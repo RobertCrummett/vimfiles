@@ -1,2 +1,2 @@
-syn match markdownLinkUnderscore "_" containedin=markdownLinkText
-hi link markdownLinkUnderscore markdownLinkText
+" syn match markdownLinkUnderscore "_" containedin=markdownLinkText
+" hi link markdownLinkUnderscore markdownLinkText
