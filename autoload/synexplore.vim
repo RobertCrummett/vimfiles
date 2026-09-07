@@ -46,8 +46,17 @@ endfunction
 function! s:attrs(d) abort
   let l:parts = []
   for l:k in ['guifg', 'guibg', 'guisp', 'gui', 'ctermfg', 'ctermbg', 'cterm', 'term']
-    if has_key(a:d, l:k) && !empty(a:d[l:k])
-      call add(l:parts, l:k . '=' . a:d[l:k])
+    if !has_key(a:d, l:k) || empty(a:d[l:k])
+      continue
+    endif
+    " The colour keys hold strings, but gui, cterm and term hold a dictionary
+    " of the attributes that are on ({'bold': v:true, ...}). Flatten those
+    " back to the comma-separated form :highlight prints.
+    let l:v = type(a:d[l:k]) == v:t_dict
+      \ ? join(sort(keys(filter(copy(a:d[l:k]), 'v:val'))), ',')
+      \ : a:d[l:k]
+    if !empty(l:v)
+      call add(l:parts, l:k . '=' . l:v)
     endif
   endfor
   return join(l:parts, ' ')
