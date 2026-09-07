@@ -1,12 +1,12 @@
-[submodule "pack/bundle/start/vim-sexp"]
-	path = pack/bundle/start/vim-sexp
+[submodule "pack/guns/start/vim-sexp"]
+	path = pack/guns/start/vim-sexp
 	url = https://github.com/guns/vim-sexp.git
-[submodule "pack/bundle/start/vim-fugitive"]
-	path = pack/bundle/start/vim-fugitive
+[submodule "pack/tpope/start/vim-fugitive"]
+	path = pack/tpope/start/vim-fugitive
 	url = https://github.com/tpope/vim-fugitive.git
-[submodule "pack/bundle/start/vim-surround"]
-	path = pack/bundle/start/vim-surround
-	url = https://github.com/tpope/vim-surround.git
-[submodule "pack/bundle/start/vim-repeat"]
-	path = pack/bundle/start/vim-repeat
+[submodule "pack/tpope/start/vim-repeat"]
+	path = pack/tpope/start/vim-repeat
 	url = https://github.com/tpope/vim-repeat.git
+[submodule "pack/tpope/start/vim-surround"]
+	path = pack/tpope/start/vim-surround
+	url = https://github.com/tpope/vim-surround.git
