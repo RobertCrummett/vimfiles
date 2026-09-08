@@ -7,6 +7,8 @@ if has('syntax') && !exists('g:syntax_on')
 endif
 filetype plugin indent on
 
+packadd! matchit
+
 set nowrap sidescroll=5
 
 set noerrorbells
@@ -97,12 +99,8 @@ let g:loaded_netrwPlugin=1
 " NOTE This works on Win32, in the gui editor. So it seems to be a problem with
 " vim from the terminal in Win32 only.
 set complete-=i foldmethod=manual
-
-" Synonyms with CTRL-X CTRL-T (autoload/thesaurus.vim, see README).
 set thesaurusfunc=thesaurus#complete
-
-" Spell check against English plus the geophysics dictionary (:help geospell).
-set spelllang=en_us,geophysics
+set spelllang=en_us,geophysics " NOTE for information on geophysics dictionary, :help geospell.
 
 " Keep the help tags for the local plugins (doc/*.txt) up to date.
 silent! execute 'helptags' fnameescape(expand('<sfile>:p:h') . '/doc')
