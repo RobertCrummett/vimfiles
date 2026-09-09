@@ -83,7 +83,7 @@ sent.
                         session first if there is not one. With ! the cursor
                         stays put, the way :make! differs from |:make|.
 
-Typing |:make| in a matlab or octave buffer runs :MatlabMake. >
+Typing |:make| in a matlab buffer runs :MatlabMake. >
 
     :make
     :clist
@@ -102,9 +102,10 @@ meantime, through the idle timeout or a crash, is started again; if none
 comes up within |g:matlabserver_start_timeout| the make is abandoned with a
 pointer to matlab/server.log.
 
-The matlab and octave ftplugins under after/ftplugin both run `compiler
-matlab`, which is where the 'errorformat' :MatlabMake reads comes from, so
-:make works the same in either.
+after/ftplugin/matlab.vim runs `compiler matlab`, which is where the
+'errorformat' :MatlabMake reads comes from. Every .m file is a matlab buffer
+here: the vimrc sets g:filetype_m, so Vim's guess between matlab and octave
+from the file's contents is never made.
 
 The buffer is written first. :make on a stale file is a trap, and Vim's own
 answer to it, 'autowrite', is a global setting this should not turn on for
@@ -119,7 +120,7 @@ Vimscript instead - the session is already a Vim channel, so |:cgetexpr| reads
 the reply straight - and the typed command is redirected to reach it.
 
 The abbreviation fires only when "make" is the whole command line so far and
-only in a matlab or octave buffer, so :make elsewhere and :makeprg are
+only in a matlab buffer, so :make elsewhere and :makeprg are
 untouched, and what ran is visible on the command line rather than hidden.
 Set |g:matlabserver_make_abbrev| to 0 to keep :make literal.
 

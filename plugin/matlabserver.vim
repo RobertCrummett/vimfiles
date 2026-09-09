@@ -53,11 +53,10 @@ command! -bar -bang    MatlabMake   call matlabserver#make(<bang>0)
 "
 " Set g:matlabserver_make_abbrev to 0 to keep :make literal.
 if get(g:, 'matlabserver_make_abbrev', 1)
-  " index() rather than "ft ==# 'matlab' || ft ==# 'octave'": a bar in the
-  " right-hand side of an abbreviation ends the command, so the expression
-  " would be stored truncated and fail with E110 every time it fired, taking
-  " the command line down with it.
+  " No "||" in here: a bar in the right-hand side of an abbreviation ends
+  " the command, so the expression would be stored truncated and fail with
+  " E110 every time it fired, taking the command line down with it.
   cnoreabbrev <expr> make
     \ (getcmdtype() ==# ':' && getcmdline() ==# 'make'
-    \   && index(['matlab', 'octave'], &filetype) >= 0) ? 'MatlabMake' : 'make'
+    \   && &filetype ==# 'matlab') ? 'MatlabMake' : 'make'
 endif

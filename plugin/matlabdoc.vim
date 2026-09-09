@@ -5,7 +5,7 @@
 "   :MatlabDocStatus     when the index was built and how much it holds
 "   :MatlabDocClear      forget answers Matlab was asked for live
 "
-" K is wired to :MatlabDoc in matlab and octave buffers, so pressing K on exp
+" K is wired to :MatlabDoc in matlab buffers, so pressing K on exp
 " opens Matlab's help for exp.
 "
 " Matlab needs about five seconds to start, which is too slow to pay per

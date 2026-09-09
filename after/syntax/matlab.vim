@@ -1,5 +1,3 @@
-" Also sourced for octave (syntax/octave.vim does 'runtime! syntax/matlab.vim').
-"
 " The bundled syntax hands the '...' line continuation to matlabComment: it
 " matches "\.\.\..*$" as a comment at line 65, after the matlabLineContinuation
 " rule at line 37, and of two matches starting at the same place the later one
@@ -23,8 +21,13 @@ hi def link matlabContinuedComment Comment
 " runtime files disagree about these - indent/matlab.vim already counts parfor,
 " spmd and enumeration among its block openers (s:open_pat).
 syn keyword matlabStatement continue
-syn keyword matlabRepeat    parfor
 syn keyword matlabOO        spmd arguments enumeration
+
+" The runtime file lists "do" among the loop keywords. That is Octave's
+" do-until; in Matlab do is an ordinary name, so a variable called do was
+" being coloured as a keyword. Rebuild the group with parfor and without it.
+syn clear matlabRepeat
+syn keyword matlabRepeat    for while parfor
 
 " break is upstream in matlabOperator, sharing a group with function names
 " like zeros, round and rand. Put it with return and continue the way

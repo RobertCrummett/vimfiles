@@ -39,8 +39,7 @@ matlab/build_index.m.
 
                                                               *matlabdoc-K*
 K                       Set to |:MatlabDoc| through 'keywordprg' in matlab
-                        buffers by after/ftplugin/matlab.vim and in octave
-                        buffers by after/ftplugin/octave.vim, so K on `exp`
+                        buffers by after/ftplugin/matlab.vim, so K on `exp`
                         opens Matlab's help for `exp`. The report window
                         sets it too, so K on a name in a `See also` line
                         follows it.

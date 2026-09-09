@@ -64,7 +64,7 @@ function's help text, built once by `matlab/build_index.m`; `:MatlabDoc`,
 keeps one Matlab session warm behind a loopback socket (`matlab/server.m`),
 so `:Matlab {command}`, `:MatlabRun` and `:MatlabMake` answer in
 milliseconds; the session closes itself after thirty idle minutes. Typing
-`:make` in a matlab or octave buffer runs `:MatlabMake`, and errors land in
+`:make` in a matlab buffer runs `:MatlabMake`, and errors land in
 the quickfix list. See `:help matlabdoc` and `:help matlabserver`.
 
 ## Help

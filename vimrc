@@ -83,6 +83,11 @@ if empty(mapcheck('<C-W>', 'i'))
   inoremap <C-W> <C-G>u<C-W>
 endif
 
+" Every .m file is Matlab. Left to itself Vim reads the file and may decide
+" on octave (a # comment, an endfunction), which has none of the Matlab
+" plugins' K or :make and is never what is being written here.
+let g:filetype_m = 'matlab'
+
 " This disables netrw
 let g:loaded_netrw=1
 let g:loaded_netrwPlugin=1
