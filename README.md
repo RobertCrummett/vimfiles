@@ -11,10 +11,12 @@ Because I always come back to this editor, I might as well study the language of
 
 ## Local plugins
 
-- **colors/custom.vim** — the bundled `quiet` scheme plus three accents used
+- **colors/custom.vim** — the bundled `quiet` scheme plus four accents used
   consistently across languages (lavender for functions, light purple for
   special characters/notation/options, pink for labels/links and vimscript
-  keywords). Language-specific links live at the end of the file.
+  keywords, light blue for text completion inserts or offers, including the
+  llm plugin's ghost text). Language-specific links live at the end of the
+  file.
 - **plugin/comments.vim** — `gc{motion}`, `gcc`, and `gc` in Visual mode
   toggle line comments; dot-repeatable, counts work. Leaders for ~140
   filetypes in `g:comment_map`; `b:comment_leader` overrides per buffer.
@@ -53,14 +55,27 @@ shifts. It is regex based: no scopes or overload resolution, and the odd
 false positive. Add patterns or extensions through `g:tagsgen_patterns` and
 `g:tagsgen_filetypes` in the vimrc.
 
+## Matlab without the wait
+
+Matlab needs about five seconds to start, so neither help nor `:make` pays
+for it. `plugin/matlabdoc.vim` answers `K` from an index of every documented
+function's help text, built once by `matlab/build_index.m`; `:MatlabDoc`,
+`:MatlabDocIndex` and `:MatlabDocStatus` drive it. `plugin/matlabserver.vim`
+keeps one Matlab session warm behind a loopback socket (`matlab/server.m`),
+so `:Matlab {command}`, `:MatlabRun` and `:MatlabMake` answer in
+milliseconds; the session closes itself after thirty idle minutes. Typing
+`:make` in a matlab or octave buffer runs `:MatlabMake`, and errors land in
+the quickfix list. See `:help matlabdoc` and `:help matlabserver`.
+
 ## Help
 
 Every local plugin has a Vim help file under `doc/`: `:help comments`,
-`:help diredit`, `:help synexplore`, `:help tagsgen`, `:help thesaurus.vim`,
-`:help sexptutor`, and any command by name, for example `:help :SynCursor`
-or `:help :MakeTags`. The vimrc rebuilds `doc/tags` at startup, so edits to
-the help files show up on the next launch; `doc/tags` itself is generated
-and ignored.
+`:help diredit`, `:help geospell`, `:help llm`, `:help matlabdoc`,
+`:help matlabserver`, `:help synexplore`, `:help tagsgen`,
+`:help thesaurus.vim`, `:help sexptutor`, and any command by name, for
+example `:help :SynCursor` or `:help :MakeTags`. The vimrc rebuilds
+`doc/tags` at startup, so edits to the help files show up on the next
+launch; `doc/tags` itself is generated and ignored.
 
 ## vim-sexp tutor
 
@@ -86,8 +101,10 @@ workflows.
 `:LlmWarm` primes the server with the file you are about to edit. `CTRL-X CTRL-A` in Insert mode asks a local model for the next word, phrase
 or line as a completion menu; `CTRL-X CTRL-B` asks for a block, streamed in
 as ghost text that `CTRL-Y` accepts and `CTRL-E` drops, the same keys as the
-menu. Progress is reported on the command line while the server loads or a
-request runs. The plugin drives llama.cpp's
+menu. Progress is reported while the server loads or a request runs: on the
+command line in Normal mode, and in a one-line popup at the bottom of the
+screen in Insert mode, where `showmode` would redraw `-- INSERT --` over
+anything echoed. The plugin drives llama.cpp's
 `llama-server`, starting it in the background on first use, never at
 startup, and stopping it when Vim exits or crashes. The model sees the text
 around the cursor plus chunks from recent jump-list positions and sibling

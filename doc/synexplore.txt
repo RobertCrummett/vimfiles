@@ -11,7 +11,7 @@ autoload/synexplore.vim.
 3. Reading a report                             |synexplore-reading|
 
 ==============================================================================
-1. Commands                                               *synexplore-commands*
+1. Commands                                              *synexplore-commands*
 
                                                     *:SynCursor* *:SynExplore*
 :SynCursor              Describe the character under the cursor: the syntax
@@ -46,7 +46,7 @@ autoload/synexplore.vim.
                         and the group's link chain.
 
 ==============================================================================
-2. The report window                                        *synexplore-window*
+2. The report window                                       *synexplore-window*
 
 Reports open in a split above the current window, read-only, unlisted, and
 kept out of the jumplist and the alternate-file history. The buffer is wiped
@@ -59,7 +59,7 @@ q                       Close the report.
                         buffer, still highlighted. A bare `:w` explains this.
 
 ==============================================================================
-3. Reading a report                                        *synexplore-reading*
+3. Reading a report                                       *synexplore-reading*
 
 Sources. Highlight groups carry the file and line they were last set from,
 which Vim records. Syntax rules do not, so the plugin searches the syntax
