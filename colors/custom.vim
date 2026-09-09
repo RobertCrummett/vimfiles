@@ -60,9 +60,10 @@ function! s:Accents() abort
   hi! link typstMathDelim          customLightPurple
   hi! link typstCodeDollar         customLightPurple
   hi! link typstHashtagDollar      customLightPurple
-  hi! link typstMathScripts        customLightPurple
+  " No typstMathScripts or typstMathSymbol here: syntax/typst.vim lists both
+  " in its @typstMath cluster but never defines a rule for either, so nothing
+  " ever carries them.
   hi! link typstMathNumber         customLightPurple
-  hi! link typstMathSymbol         customLightPurple
   hi! link typstMathIdentifier     customLightPurple
   hi! link typstMathFunction       customLightPurple
 
@@ -80,7 +81,8 @@ function! s:Accents() abort
   hi! link vimAutocmdBufferPattern customLightPurple
   hi! link vimMapMod       customLightPurple
   hi! link vimBracket      customLightPurple
-  hi! link vimFuncSID      customLightPurple
+  " <SID> in a function name is vimFunctionSID, which already defaults to
+  " vimNotation, so it needs no link of its own.
   hi! link vimOption       customLightPurple
   " Scope prefixes such as a: b: g: l: s: on variables and functions.
   hi! link vimVarScope      customLightPurple
@@ -135,6 +137,11 @@ function! s:Accents() abort
   hi! link matlabSemicolon        customLavendar
   hi! link matlabLineContinuation customLavendar
   hi! link matlabStatement        customLavendar
+  " classdef, properties, methods and the block openers after/syntax/matlab.vim
+  " adds to matlabOO (spmd, arguments, enumeration); upstream leaves the group
+  " on Statement, which quiet does not colour, so they would read as plain text
+  " next to function, for and if.
+  hi! link matlabOO               customLavendar
   hi! link matlabString           customLightPurple
 
   " Lisp
@@ -152,7 +159,6 @@ function! s:Accents() abort
   hi! link synexploreLabel   customLavendar
   hi! link synexploreYours   customLightPurple
   hi! link synexploreOwner   customLightPurple
-  hi! link synexploreItemNum customPink
 
 endfunction
 
