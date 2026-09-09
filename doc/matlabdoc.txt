@@ -87,9 +87,16 @@ found and the session's own directory is left as it was.
 |g:matlabdoc_session_timeout| bounds the wait. Without a session, or if it
 does not answer, they fall through to `matlab -batch help {name}`,
 run as a background job so Vim never blocks, with Matlab started in the
-current file's directory so functions you wrote are found. Either answer is
-remembered for the rest of the session, except "not found", which may
-change once the file is saved or the path does.
+current file's directory so functions you wrote are found.
+
+What a live lookup answered is kept. Every answer is remembered for the rest
+of the session, except "not found", which may change once the file is saved
+or the path does. And when Matlab's which() places the name under
+matlabroot, a toolbox function the build missed, the text also goes into
+matlab/index/ on disk, so no later session asks again; the report's last
+line says "added to the index", and afterwards "index, added" with the
+date. Functions of your own never enter the index: their help changes as
+you edit them, and the session cache is enough.
 
 ==============================================================================
 3. The report window                                        *matlabdoc-window*
