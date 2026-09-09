@@ -74,16 +74,17 @@ function! s:Accents() abort
   " variable scope prefixes (a: b: v: ...) are notation.
   hi! link vimCommand      customPink
   hi! link vimBang         customPink
+  hi! link vimFunctionMod  customPink
   hi! link vimFunctionName customLavendar
   hi! link vimUserFunc     customLavendar
-  hi! link vimVimVar       customLightPurple
-  hi! link vimNotation     customLightPurple
+  hi! link vimVimVar        customLightPurple
+  hi! link vimNotation      customLightPurple
   hi! link vimAutocmdBufferPattern customLightPurple
-  hi! link vimMapMod       customLightPurple
-  hi! link vimBracket      customLightPurple
+  hi! link vimMapMod        customLightPurple
+  hi! link vimBracket       customLightPurple
   " <SID> in a function name is vimFunctionSID, which already defaults to
   " vimNotation, so it needs no link of its own.
-  hi! link vimOption       customLightPurple
+  hi! link vimOption        customLightPurple
   " Scope prefixes such as a: b: g: l: s: on variables and functions.
   hi! link vimVarScope      customLightPurple
   hi! link vimFunctionScope customLightPurple
