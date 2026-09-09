@@ -43,3 +43,7 @@
 # machine-specific and rebuilt after a Matlab upgrade. The generator is tracked.
 /matlabdoc/index/
 /matlabdoc/build.log
+
+# Console output of the background Matlab session (:MatlabStart). The server
+# script itself is tracked.
+/matlabserver/server.log

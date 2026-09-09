@@ -1,0 +1,122 @@
+*matlabserver.txt*   One Matlab session, kept warm   *matlabserver-plugin*
+
+                                          *matlabserver* *plugin-matlabserver*
+Keeps a Matlab session alive in the background and talks to it over a
+loopback socket, so running something costs milliseconds instead of the five
+seconds Matlab needs to start. Lives in plugin/matlabserver.vim,
+autoload/matlabserver.vim and matlabserver/server.m.
+
+1. Commands                                     |matlabserver-commands|
+2. The session                                  |matlabserver-session|
+3. When it closes                               |matlabserver-idle|
+4. Output                                       |matlabserver-output|
+5. Settings                                     |matlabserver-settings|
+
+==============================================================================
+1. Commands                                            *matlabserver-commands*
+
+                                                              *:MatlabStart*
+:MatlabStart            Start the session. Takes a few seconds, once. Vim
+                        does not block: carry on and use |:MatlabStatus| to
+                        see when it is ready.
+
+                                                               *:MatlabStop*
+:MatlabStop             Ask the session to quit and shut it down. Also run
+                        automatically when Vim exits.
+
+                                                             *:MatlabStatus*
+:MatlabStatus           Whether the session is up, the measured round trip,
+                        the Matlab release, its current directory, and how
+                        long it will sit idle before closing itself.
+
+                                                                   *:Matlab*
+:Matlab {command}       Evaluate {command} in the session. Short output is
+                        echoed, longer output opens a window; see
+                        |matlabserver-output|.
+
+                                                                *:MatlabRun*
+:MatlabRun              Write the current buffer and run it. Matlab is moved
+                        to the file's directory first, so helper functions
+                        sitting beside it resolve.
+
+==============================================================================
+2. The session                                          *matlabserver-session*
+
+The session is its own Matlab process with its own workspace. It shares
+nothing with a Matlab desktop you have open, and it does not stop you
+opening one: an Individual licence lets the same user run several sessions
+at once. This was measured, not assumed - one session was held open while a
+second started, and both ran.
+
+So keep the desktop for the debugger, where the GUI earns its keep, and use
+this one for running things without waiting. Variables set by |:Matlab| are
+not visible to the desktop and vice versa.
+
+Round trips measured on this machine, against a five second cold start: >
+
+    startup                          ~4 s   (once)
+    :MatlabStatus round trip           8 ms
+    A = magic(4); disp(A)            6.7 ms
+    y = 2+2                          1.3 ms
+    two 400x400 SVDs                  88 ms
+<
+The socket comes from Java's ServerSocket rather than `tcpserver`, which
+needs the Instrument Control Toolbox; Matlab always ships a JVM. It binds
+loopback only and refuses anything else, because it evaluates whatever it is
+sent.
+
+==============================================================================
+3. When it closes                                          *matlabserver-idle*
+
+A forgotten session would hold several hundred megabytes for the rest of the
+day, so it closes itself. It shuts down after |g:matlabserver_idle| seconds
+with nothing to do, thirty minutes by default, and Vim reports that the
+session exited the next time it looks.
+
+The clock covers waiting for a client and waiting for a command from one. It
+does not run while a command is being evaluated, so a long computation is
+never cut short however long it takes.
+
+The timeout is enforced inside server.m rather than by a Vim timer, so it
+still fires if Vim is killed outright and never gets to clean up. Leaving
+Vim normally shuts the session down through |VimLeavePre| as well, which
+lets Matlab quit in its own time instead of being cut off.
+
+==============================================================================
+4. Output                                                *matlabserver-output*
+
+Output of one or two lines is echoed on the status line. Anything longer, or
+anything that raised, opens a split above the current window: read-only,
+unlisted, wiped when closed, and reused by the next command.
+
+q                       Close the output window.
+K                       Look the name under the cursor up with |:MatlabDoc|.
+
+Errors are reported as Matlab's message plus the frames from your own code.
+The `evalc` and server.m frames that carry the command are dropped, as are
+warning backtraces, the clickable `<a href="matlab:...">` markup Matlab
+writes for its own desktop, and the backspaces it pads warning text with. >
+
+    Error: Undefined function 'undefinedThing' for input arguments of
+    type 'double'.
+<
+==============================================================================
+5. Settings                                            *matlabserver-settings*
+
+                                                       *g:matlabserver_port*
+g:matlabserver_port     Loopback port to listen on. Default 51763.
+
+                                                       *g:matlabserver_idle*
+g:matlabserver_idle     Seconds of quiet before the session closes itself.
+                        Default 1800, thirty minutes. See
+                        |matlabserver-idle|.
+
+                                                    *g:matlabserver_timeout*
+g:matlabserver_timeout  How long to wait for a reply, in milliseconds.
+                        Default 60000. Raise it if you run something slow
+                        with |:MatlabRun|.
+
+g:matlabdoc_program     Which matlab.exe to run, shared with |matlabdoc|.
+                        Documented at |g:matlabdoc_program|.
+
+ vim:tw=78:ts=8:ft=help:norl:
