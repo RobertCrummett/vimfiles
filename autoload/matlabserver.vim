@@ -108,8 +108,11 @@ function! matlabserver#start() abort
     call s:err('no matlab.exe found; set g:matlabdoc_program')
     return
   endif
-  let s:job = job_start([l:exe, '-sd', s:dir(), '-batch',
-    \ printf('server(%d, %d)', s:port(), s:idle())],
+  " Under the watchdog so that a Vim that is killed rather than quit takes
+  " the session with it; a normal exit does that by itself, a killed one
+  " left MATLAB.exe running until the idle timeout. See autoload/watchdog.vim.
+  let s:job = job_start(watchdog#wrap([l:exe, '-sd', s:dir(), '-batch',
+    \ printf('server(%d, %d)', s:port(), s:idle())]),
     \ {'in_io': 'null', 'out_io': 'file', 'out_name': s:dir() . '/server.log',
     \  'err_io': 'out', 'exit_cb': function('s:exited')})
   if job_status(s:job) !=# 'run'

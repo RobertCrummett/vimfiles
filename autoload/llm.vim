@@ -300,36 +300,6 @@ function! s:server_exe() abort
   return ''
 endfunction
 
-" Wrap the server command so that it dies with Vim even if Vim crashes:
-" a small watchdog that waits for either process to end and then kills the
-" other. On a clean exit Vim kills the whole job tree itself.
-" PowerShell single-quoted literal.
-function! s:psq(s) abort
-  return "'" . substitute(a:s, "'", "''", 'g') . "'"
-endfunction
-
-" One element of Start-Process -ArgumentList. PowerShell joins the list
-" with spaces and adds no quoting of its own, so an argument with a space
-" in it (a model under "C:\Users\Some Name\...") has to carry its own
-" double quotes for the server to see it as one argument.
-function! s:psarg(s) abort
-  return s:psq(a:s =~# '\s' ? '"' . a:s . '"' : a:s)
-endfunction
-
-function! s:watchdog(cmd) abort
-  let l:pid = getpid()
-  if has('win32')
-    let l:script = '$p = Start-Process -PassThru -NoNewWindow -FilePath ' . s:psq(a:cmd[0])
-      \ . ' -ArgumentList @(' . join(map(a:cmd[1:], 's:psarg(v:val)'), ',') . ');'
-      \ . ' while (-not $p.HasExited -and (Get-Process -Id ' . l:pid . ' -ErrorAction SilentlyContinue)) { Start-Sleep -Milliseconds 500 };'
-      \ . ' if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force }'
-    return ['powershell', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', l:script]
-  endif
-  let l:script = '"$0" "$@" & c=$!; trap "kill $c 2>/dev/null" EXIT TERM INT;'
-    \ . ' while kill -0 ' . l:pid . ' 2>/dev/null && kill -0 $c 2>/dev/null; do sleep 1; done'
-  return ['sh', '-c', l:script] + a:cmd
-endfunction
-
 " The full command the server is (or would be) started with; shown by
 " :LlmStatus and handy when a start fails.
 function! llm#command() abort
@@ -338,7 +308,7 @@ function! llm#command() abort
   if empty(l:exe) || empty(l:model)
     return []
   endif
-  return s:watchdog(s:server_cmd(l:exe, l:model))
+  return watchdog#wrap(s:server_cmd(l:exe, l:model))
 endfunction
 
 " g:llm_slots prompt caches of g:llm_ctx tokens each; the server's total
@@ -631,7 +601,7 @@ function! s:start_after_probe(health) abort
   let l:model = llm#model_path(s:model_name())
   let l:cmd = s:server_cmd(l:exe, l:model)
   let s:log = ['llm: ' . join(l:cmd, ' ')]
-  let s:job = job_start(s:watchdog(l:cmd), {
+  let s:job = job_start(watchdog#wrap(l:cmd), {
     \ 'in_io': 'null',
     \ 'out_cb': function('s:log_cb'), 'err_cb': function('s:log_cb'),
     \ 'exit_cb': function('s:exit_cb'),

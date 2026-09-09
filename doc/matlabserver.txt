@@ -162,7 +162,12 @@ An exit you asked for with |:MatlabStop| is not reported that way, and an
 exit with a non-zero status points at matlab/server.log instead.
 
 The timeout is enforced inside server.m rather than by a Vim timer, so it
-still fires if Vim is killed outright and never gets to clean up. Leaving
+still fires if Vim is killed outright and never gets to clean up. Before
+that, the session is started under the same watchdog as the llm plugin's
+server (autoload/watchdog.vim): a PowerShell wrapper that notices Vim's
+process is gone and kills the Matlab process tree within a second, MATLAB.exe
+included. Leaving Vim normally ends the session at once through Vim's own job
+teardown; the watchdog is for the crash. Leaving
 Vim normally sends a quit through |VimLeavePre| as well, and does not wait
 for the answer: Matlab reads it and shuts down in its own time, a second or
 two of JVM teardown later, instead of being cut off mid-write.
