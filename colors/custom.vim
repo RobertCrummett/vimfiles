@@ -129,10 +129,12 @@ function! s:Accents() abort
 
   " Matlab
   hi! link matlabConditional      customLavendar
+  hi! link matlabExceptions       customLavendar
   hi! link matlabRepeat           customLavendar
   hi! link matlabLabel            customLavendar
   hi! link matlabSemicolon        customLavendar
   hi! link matlabLineContinuation customLavendar
+  hi! link matlabStatement        customLavendar
   hi! link matlabString           customLightPurple
 
   " Lisp
