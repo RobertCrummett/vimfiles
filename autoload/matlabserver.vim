@@ -123,17 +123,6 @@ function! matlabserver#ensure(timeout_ms) abort
   return 0
 endfunction
 
-" Let go of our connection without stopping the session. server.m serves one
-" client at a time, so while Vim holds the socket nothing else can be served:
-" :make shells out to matlab/mlmake.py, which needs the server free. The next
-" eval reconnects on its own.
-function! matlabserver#release() abort
-  if s:ch isnot v:null && ch_status(s:ch) ==# 'open'
-    call ch_close(s:ch)
-  endif
-  let s:ch = v:null
-endfunction
-
 function! matlabserver#stop() abort
   if s:ch isnot v:null && ch_status(s:ch) ==# 'open'
     call ch_sendraw(s:ch, "quit\n")
@@ -280,20 +269,60 @@ augroup matlabserver_exit
   autocmd VimLeavePre * if matlabserver#running() | call matlabserver#stop() | endif
 augroup END
 
-" Called from QuickFixCmdPre, for every :make in any buffer, so it has to
-" decide whether this one is ours.
-function! matlabserver#make_pre() abort
-  if &filetype !=# 'matlab' && &filetype !=# 'octave'
-    return
-  endif
+" Run the current file and put whatever it raised into the quickfix list, so
+" :clist, :cnext and :cc walk it. This is what :make reaches in a Matlab
+" buffer; see the abbreviation in plugin/matlabserver.vim.
+"
+" Written in Vimscript rather than behind 'makeprg'. :make would have to shell
+" out to a program that can speak to the socket, and no such program ships
+" with Vim, Windows or Matlab; the session is already a Vim channel, so
+" :cgetexpr can read the reply straight and nothing else has to be installed.
+" It is also faster, and it avoids the deadlock a second client caused: the
+" session serves one at a time, and Vim holding the socket starved it.
+"
+" With a bang the cursor stays put, the way :make! differs from :make.
+function! matlabserver#make(bang) abort
+  " :make on a stale file is a trap, and Vim's own answer to it, 'autowrite',
+  " is a global setting this should not turn on for you.
   if &modified && !empty(bufname('%'))
     silent update
+  endif
+  let l:file = expand('%:p')
+  if empty(l:file)
+    call s:warn('this buffer has no file to run')
+    return
   endif
   if !matlabserver#ensure(get(g:, 'matlabserver_start_timeout', 30000))
     return
   endif
-  " mlmake.py is about to connect, and the session only talks to one client
-  " at a time.
-  call matlabserver#release()
+  let l:name = fnamemodify(l:file, ':t:r')
+  redraw
+  echo 'matlabserver: running ' . l:name . ' ...'
+  let l:res = matlabserver#eval_sync(
+    \ printf("cd('%s'); %s", escape(fnamemodify(l:file, ':h'), "'"), l:name),
+    \ get(g:, 'matlabserver_timeout', 60000))
+
+  redraw
+  if l:res.ok
+    " Nothing raised, so there is nothing for the quickfix list; show whatever
+    " the file printed instead.
+    call setqflist([], 'r')
+    call s:report('Matlab make ' . l:name, l:res)
+    return
+  endif
+  " cgetexpr reads this buffer's 'errorformat', which compiler/matlab.vim set,
+  " against the file:line: message lines server.m produces.
+  cgetexpr l:res.lines
+  let l:n = len(getqflist())
+  if l:n == 0
+    call s:report('Matlab make ' . l:name, l:res)
+    return
+  endif
+  if !a:bang
+    cfirst
+  endif
+  redraw
+  echo printf('matlabserver: %s raised, %d quickfix entr%s (:clist)',
+    \ l:name, l:n, l:n == 1 ? 'y' : 'ies')
 endfunction
 
