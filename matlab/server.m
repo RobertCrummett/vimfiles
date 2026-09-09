@@ -29,9 +29,9 @@ function server(port, idleSeconds)
 %
 %   One client at a time. Matlab is single threaded and a second caller
 %   could not be served while the first one's command runs, so the accept
-%   loop finishes with one connection before taking the next. Vim drops its
-%   channel before :make shells out for exactly this reason; see
-%   matlabserver#release().
+%   loop finishes with one connection before taking the next. A client that
+%   gives up waiting closes its socket; the reply then goes nowhere, and the
+%   next connection starts clean.
 
 if nargin < 2 || isempty(idleSeconds)
     idleSeconds = 1800;
@@ -74,11 +74,17 @@ while true
     while true
         try
             line = in.readLine();
-        catch
-            % Same again: a client that connected and then went quiet.
-            fprintf('server: idle for %g s; shutting down\n', idleSeconds);
-            sock.close();
-            return
+        catch err
+            if isSocketTimeout(err)
+                % Same again: a client that connected and then went quiet.
+                fprintf('server: idle for %g s; shutting down\n', idleSeconds);
+                sock.close();
+                return
+            end
+            % Any other failure is the client going away: Vim gave up on a
+            % slow command and closed its socket, or exited. That is not a
+            % reason to stop; take the next connection.
+            break
         end
         if isempty(line)
             break                      % client hung up
@@ -90,25 +96,52 @@ while true
             return
         end
         status = 0;
-        try
-            txt = evalc(cmd);
-        catch err
+        caught = [];
+        % The command runs in the base workspace, not in this function's:
+        % here it would share a workspace with the plumbing, and a script
+        % opening with "clear all" (or assigning to out, srv, cmd ...) took
+        % the whole session down. Under -batch the base workspace starts
+        % empty, so "clear all" there clears only what the user made.
+        %
+        % The try/catch sits inside the evalc so that what the command
+        % printed before it raised is kept and shown ahead of the error;
+        % an error thrown through evalc would discard that output.
+        txt = evalc('try, evalin(''base'', cmd), catch caught, end');
+        if ~isempty(caught)
             % Reported as "file:line: message", the shape compiler/matlab.vim
             % gives Vim's errorformat, so :make drops the error straight into
             % the quickfix list and :clist and :cnext can walk it.
             %
-            % err.getReport would name evalc and this file in the stack, which
-            % is our plumbing and not the caller's problem, so those frames go.
+            % The report would name evalin, evalc and this file in the stack,
+            % which is our plumbing and not the caller's problem, so those
+            % frames go.
             here = [mfilename('fullpath') '.m'];
-            frames = err.stack;
+            frames = caught.stack;
             if ~isempty(frames)
                 keep = arrayfun(@(f) ~isempty(f.file) && ~strcmp(f.file, here), frames);
                 frames = frames(keep);
             end
             % One line only: errorformat's %m stops at the end of the line,
-            % and \s covers the newlines a multi-line message carries.
-            msg = strtrim(regexprep(err.message, '\s+', ' '));
-            if isempty(frames)
+            % and \s covers the newlines a multi-line message carries. A
+            % parse error's message already opens with "Error: ", which the
+            % line below adds again.
+            msg = strtrim(regexprep(caught.message, '\s+', ' '));
+            % Parse errors carry an opentoline hotlink around the position
+            % even with hotlinks off; drop the markup before reading it.
+            msg = regexprep(msg, '</?a[^>]*>', '');
+            msg = regexprep(msg, '^Error:\s*', '');
+            % A parse error has no stack; its position is in the message,
+            % as "File: name.m Line: 2 Column: 5". The name is relative to
+            % the directory the command cd'd into, so resolve it here where
+            % that directory is current.
+            pos = regexp(msg, '^File: (\S+) Line: (\d+) Column: (\d+) (.*)$', 'tokens', 'once');
+            if isempty(frames) && ~isempty(pos)
+                f = which(pos{1});
+                if isempty(f)
+                    f = pos{1};
+                end
+                lines = {sprintf('%s:%s:%s: %s', f, pos{2}, pos{3}, pos{4})};
+            elseif isempty(frames)
                 lines = {sprintf('Error: %s', msg)};
             else
                 lines = {sprintf('%s:%d: %s', frames(1).file, frames(1).line, msg)};
@@ -117,7 +150,10 @@ while true
                         frames(k).file, frames(k).line, frames(k).name); %#ok<AGROW>
                 end
             end
-            txt = strjoin(lines, newline);
+            if ~isempty(txt) && txt(end) ~= newline
+                txt = [txt newline];
+            end
+            txt = [txt strjoin(lines, newline)];
             status = 1;
         end
         txt = regexprep(txt, '\r\n?', '\n');
@@ -125,13 +161,21 @@ while true
         % pads warning text with for terminal rendering.
         txt = regexprep(txt, '</?a[^>]*>', '');
         txt = strrep(txt, char(8), '');
-        for piece = strsplit(txt, '\n')
+        % CollapseDelimiters is on by default and would fold the blank lines
+        % out of the output.
+        for piece = strsplit(txt, '\n', 'CollapseDelimiters', false)
             sendLine(out, piece{1});
         end
         sendLine(out, sprintf('%s %d', SENTINEL, status));
     end
     sock.close();
 end
+end
+
+function tf = isSocketTimeout(err)
+%ISSOCKETTIMEOUT  True when a caught error is Java's SocketTimeoutException.
+tf = isa(err, 'matlab.exception.JavaException') && ...
+    isa(err.ExceptionObject, 'java.net.SocketTimeoutException');
 end
 
 function sendLine(out, text)

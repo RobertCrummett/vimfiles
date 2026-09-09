@@ -36,10 +36,14 @@ let s:matlab = substitute(s:matlab, '\\', '/', 'g')
 execute 'CompilerSet makeprg='
   \ . escape('"' . s:matlab . '" -batch "cd(''%:p:h:gs?\\?/?''); %:t:r"', ' \|"')
 
-" Anything that is not an error is Matlab's own output: shown by :make, kept
-" out of the quickfix list. An error with no stack, raised from the command
-" line rather than inside a file, still gets an entry so it is not dropped.
-CompilerSet errorformat=%f:%l:\ %m,Error:\ %m,%-G%.%#
+" Runtime errors come as file:line: message, parse errors (which server.m
+" resolves from Matlab's "File: x.m Line: 2 Column: 5" wording) with the
+" column as well. Anything that is not an error is Matlab's own output:
+" shown by :make, kept out of :clist. An error with no stack at all, raised
+" from the command line rather than inside a file, still gets an entry, but
+" Vim marks an entry with no file and no line invalid, so :clist hides it
+" (:clist! shows it) and :MatlabMake falls back to the output window.
+CompilerSet errorformat=%f:%l:%c:\ %m,%f:%l:\ %m,Error:\ %m,%-G%.%#
 
 unlet s:matlab
 let &cpo = s:save_cpo

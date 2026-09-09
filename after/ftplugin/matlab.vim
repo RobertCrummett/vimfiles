@@ -29,3 +29,4 @@ compiler matlab
 " :setfiletype something-else still restores everything.
 let b:undo_ftplugin = (empty(get(b:, 'undo_ftplugin', '')) ? '' : b:undo_ftplugin . ' | ')
   \ . 'setlocal shiftwidth< softtabstop< keywordprg< makeprg< errorformat<'
+  \ . ' | unlet! b:current_compiler'

@@ -61,15 +61,38 @@ function! s:connect() abort
   if s:ch isnot v:null && ch_status(s:ch) ==# 'open'
     return 1
   endif
+  " Raw rather than nl mode: ch_read() in nl mode returns an empty string
+  " both for an empty line and for a timeout, so every 200 ms of a slow
+  " command showed up as a blank line at the top of its output. In raw mode
+  " an empty read means only that nothing has arrived; lines are split here.
   let s:ch = ch_open('127.0.0.1:' . s:port(),
-    \ {'mode': 'nl', 'waittime': 200, 'drop': 'never'})
+    \ {'mode': 'raw', 'waittime': 200, 'drop': 'never'})
   return ch_status(s:ch) ==# 'open'
 endfunction
 
-function! s:started(job, status) abort
-  let s:job = v:null
+function! s:disconnect() abort
+  if s:ch isnot v:null
+    silent! call ch_close(s:ch)
+  endif
   let s:ch = v:null
-  echomsg 'matlabserver: the Matlab session exited (status ' . a:status . ')'
+endfunction
+
+function! s:exited(job, status) abort
+  " After :MatlabStop the job is already forgotten and the exit is expected;
+  " only an exit nobody asked for is worth a message. Status 0 out of the
+  " blue is the idle timeout in server.m.
+  if a:job isnot s:job
+    return
+  endif
+  let s:job = v:null
+  call s:disconnect()
+  if a:status == 0
+    echomsg printf('matlabserver: the Matlab session has ended (it closes itself after'
+      \ . ' %d min idle); :MatlabStart brings it back', s:idle() / 60)
+  else
+    echomsg 'matlabserver: the Matlab session exited with status ' . a:status
+      \ . '; see ' . s:dir() . '/server.log'
+  endif
 endfunction
 
 function! matlabserver#start() abort
@@ -85,7 +108,7 @@ function! matlabserver#start() abort
   let s:job = job_start([l:exe, '-sd', s:dir(), '-batch',
     \ printf('server(%d, %d)', s:port(), s:idle())],
     \ {'in_io': 'null', 'out_io': 'file', 'out_name': s:dir() . '/server.log',
-    \  'err_io': 'out', 'exit_cb': function('s:started')})
+    \  'err_io': 'out', 'exit_cb': function('s:exited')})
   if job_status(s:job) !=# 'run'
     let s:job = v:null
     call s:err('could not run ' . l:exe)
@@ -103,13 +126,21 @@ function! matlabserver#ensure(timeout_ms) abort
   if matlabserver#eval_sync('1', 500).ok
     return 1
   endif
-  if !matlabserver#running()
-    call matlabserver#start()
-  endif
   let l:start = reltime()
+  let l:started = 0
   while reltimefloat(reltime(l:start)) * 1000 < a:timeout_ms
+    " A session that has gone (idle timeout, crash) is only noticed when
+    " its exit callback runs, which can be during the sleep below; so the
+    " start is inside the loop, once.
     if !matlabserver#running()
-      break
+      if l:started
+        break
+      endif
+      call matlabserver#start()
+      let l:started = 1
+      if !matlabserver#running()
+        return 0
+      endif
     endif
     if matlabserver#eval_sync('1', 500).ok
       redraw
@@ -117,6 +148,12 @@ function! matlabserver#ensure(timeout_ms) abort
         \ reltimefloat(reltime(l:start)))
       return 1
     endif
+    " Until server.m is listening the connect fails at once, so pace the
+    " retries and say how long the wait has been rather than spin silently.
+    sleep 250m
+    redraw
+    echo printf('matlabserver: starting Matlab, %.0f s ...',
+      \ reltimefloat(reltime(l:start)))
   endwhile
   call s:err('the session did not come up within '
     \ . (a:timeout_ms / 1000) . ' s; see ' . s:dir() . '/server.log')
@@ -124,15 +161,25 @@ function! matlabserver#ensure(timeout_ms) abort
 endfunction
 
 function! matlabserver#stop() abort
+  let l:job = s:job
+  let s:job = v:null
+  let l:asked = 0
   if s:ch isnot v:null && ch_status(s:ch) ==# 'open'
     call ch_sendraw(s:ch, "quit\n")
-    call ch_close(s:ch)
+    let l:asked = 1
   endif
-  let s:ch = v:null
-  if matlabserver#running()
-    call job_stop(s:job)
+  call s:disconnect()
+  if l:job isnot v:null && job_status(l:job) ==# 'run'
+    if l:asked
+      " Matlab leaves by itself once it reads the quit, a second or two of
+      " JVM teardown later; nobody waits for that. Only a session too busy
+      " to read it is cut off, so that a :MatlabStart meanwhile finds the
+      " port free.
+      call timer_start(5000, {-> job_status(l:job) ==# 'run' ? job_stop(l:job, 'kill') : 0})
+    else
+      call job_stop(l:job, 'kill')
+    endif
   endif
-  let s:job = v:null
   echo 'matlabserver: stopped'
 endfunction
 
@@ -161,31 +208,56 @@ function! matlabserver#eval_sync(cmd, timeout_ms) abort
   if !matlabserver#running()
     return {'ok': 0, 'status': -1, 'lines': ['matlabserver is not running; :MatlabStart']}
   endif
+  " The protocol is one command per line. A newline inside the command would
+  " be read as a second command, and every reply after that would answer the
+  " wrong question.
+  if a:cmd =~# "[\n\r]"
+    return {'ok': 0, 'status': -1, 'lines': ['a command must be a single line']}
+  endif
   if !s:connect()
     return {'ok': 0, 'status': -1, 'lines': ['could not connect on port ' . s:port()
       \ . '; Matlab may still be starting']}
   endif
-  call ch_sendraw(s:ch, a:cmd . "\n")
-  let l:lines = []
-  let l:deadline = reltime()
-  while reltimefloat(reltime(l:deadline)) * 1000 < a:timeout_ms
-    let l:line = ch_read(s:ch, {'timeout': 200})
-    if empty(l:line) && ch_status(s:ch) !=# 'open'
-      return {'ok': 0, 'status': -1, 'lines': l:lines + ['connection closed']}
-    endif
-    if l:line =~# '^' . s:sentinel
-      let l:status = str2nr(matchstr(l:line, '\d\+$'))
-      while !empty(l:lines) && empty(trim(l:lines[-1]))
-        call remove(l:lines, -1)
-      endwhile
-      return {'ok': l:status == 0, 'status': l:status, 'lines': l:lines}
-    endif
-    if !empty(l:line) || ch_status(s:ch) ==# 'open'
-      call add(l:lines, l:line)
-    endif
+  " Anything still unread is the tail of a reply that was given up on; drop
+  " it so it is not taken for this command's answer.
+  while !empty(ch_readraw(s:ch, {'timeout': 0}))
   endwhile
+  call ch_sendraw(s:ch, a:cmd . "\n")
+  let l:buf = ''
+  let l:lines = []
+  let l:start = reltime()
+  while reltimefloat(reltime(l:start)) * 1000 < a:timeout_ms
+    let l:chunk = ch_readraw(s:ch, {'timeout': 100})
+    if empty(l:chunk)
+      if ch_status(s:ch) !=# 'open'
+        call s:disconnect()
+        return {'ok': 0, 'status': -1, 'lines': l:lines + ['connection closed']}
+      endif
+      continue
+    endif
+    let l:buf .= l:chunk
+    let l:nl = strridx(l:buf, "\n")
+    if l:nl < 0
+      continue
+    endif
+    for l:line in split(strpart(l:buf, 0, l:nl), "\n", 1)
+      if l:line =~# '^' . s:sentinel
+        let l:status = str2nr(matchstr(l:line, '\d\+$'))
+        while !empty(l:lines) && empty(trim(l:lines[-1]))
+          call remove(l:lines, -1)
+        endwhile
+        return {'ok': l:status == 0, 'status': l:status, 'lines': l:lines}
+      endif
+      call add(l:lines, l:line)
+    endfor
+    let l:buf = strpart(l:buf, l:nl + 1)
+  endwhile
+  " The reply, when it does arrive, would be mistaken for the next command's.
+  " Dropping the connection makes the session discard it: writes to a closed
+  " socket go nowhere, and the next command opens a fresh one.
+  call s:disconnect()
   return {'ok': 0, 'status': -1, 'lines': l:lines + ['timed out after '
-    \ . a:timeout_ms . ' ms']}
+    \ . a:timeout_ms . ' ms; the session is still running the command']}
 endfunction
 
 " ------------------------------------------------------------- report
@@ -257,7 +329,8 @@ function! matlabserver#run() abort
   endif
   let l:dir = fnamemodify(l:file, ':h')
   let l:name = fnamemodify(l:file, ':t:r')
-  let l:cmd = printf("cd('%s'); %s", escape(l:dir, "'"), l:name)
+  " A quote inside a Matlab string is doubled, not backslashed.
+  let l:cmd = printf("cd('%s'); %s", substitute(l:dir, "'", "''", 'g'), l:name)
   call s:report('Matlab run ' . l:name,
     \ matlabserver#eval_sync(l:cmd, get(g:, 'matlabserver_timeout', 60000)))
 endfunction
@@ -299,7 +372,7 @@ function! matlabserver#make(bang) abort
   redraw
   echo 'matlabserver: running ' . l:name . ' ...'
   let l:res = matlabserver#eval_sync(
-    \ printf("cd('%s'); %s", escape(fnamemodify(l:file, ':h'), "'"), l:name),
+    \ printf("cd('%s'); %s", substitute(fnamemodify(l:file, ':h'), "'", "''", 'g'), l:name),
     \ get(g:, 'matlabserver_timeout', 60000))
 
   redraw
@@ -313,7 +386,10 @@ function! matlabserver#make(bang) abort
   " cgetexpr reads this buffer's 'errorformat', which compiler/matlab.vim set,
   " against the file:line: message lines server.m produces.
   cgetexpr l:res.lines
-  let l:n = len(getqflist())
+  " Lines that matched no format are kept as invalid entries (:clist! shows
+  " them); only the ones with a position count, and without any of those
+  " the output window says more than an empty :clist would.
+  let l:n = len(filter(getqflist(), 'v:val.valid'))
   if l:n == 0
     call s:report('Matlab make ' . l:name, l:res)
     return
