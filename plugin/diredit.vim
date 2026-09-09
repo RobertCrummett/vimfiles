@@ -26,7 +26,8 @@ augroup diredit
   autocmd BufReadCmd  diredit://* call diredit#render()
   autocmd BufWriteCmd diredit://* call diredit#apply()
   " Refresh a listing when coming back to it, unless it has unsaved edits.
-  autocmd BufEnter    diredit://* if exists('b:diredit_dir') && !&modified | call diredit#render() | endif
+  autocmd BufEnter    diredit://* call diredit#refresh()
+  autocmd BufLeave    diredit://* unlet! b:diredit_fresh
   " Opening a directory (:e ., vim .) lands in a listing instead of an
   " empty buffer.
   autocmd BufEnter    * ++nested call diredit#hijack(expand('<amatch>'))

@@ -29,6 +29,13 @@ function! s:exists(path) abort
   return filereadable(a:path) || isdirectory(a:path) || getftype(a:path) !=# ''
 endfunction
 
+" The same path as far as the file system is concerned. Windows and macOS
+" ignore case, so there a rename that only changes case is a move whose
+" destination "exists" before it starts.
+function! s:same_path(a, b) abort
+  return a:a ==# a:b || (!has('fname_case') && a:a ==? a:b)
+endfunction
+
 function! s:bufdir() abort
   return substitute(bufname(''), '^diredit://', '', '')
 endfunction
@@ -73,7 +80,8 @@ function! diredit#open(dir) abort
   if !isdirectory(l:dir)
     return s:error('Not a directory: ' . l:dir)
   endif
-  execute 'edit' fnameescape('diredit://' . l:dir)
+  " silent: the "N lines --50%--" file message means nothing for a listing.
+  execute 'silent edit' fnameescape('diredit://' . l:dir)
 endfunction
 
 function! diredit#open_parent() abort
@@ -189,10 +197,38 @@ function! diredit#render() abort
 
   let l:view = winsaveview()
   setlocal modifiable
+  " Rendering is not an edit. With 'undolevels' at -1 while the lines go in,
+  " the undo history is dropped and the render is not recorded, so u after
+  " opening or reloading cannot turn the listing into an empty buffer that
+  " :w would read as "delete everything". Edits made afterwards undo as
+  " usual.
+  let l:ul = &l:undolevels
+  setlocal undolevels=-1
   silent %delete _
   call setline(1, l:lines)
+  if l:ul == -123456
+    setlocal undolevels<
+  else
+    let &l:undolevels = l:ul
+  endif
   call winrestview(l:view)
   setlocal nomodified
+  " BufEnter fires right after BufReadCmd on an :edit; tell it this listing
+  " is fresh so it is not built twice. The flag goes when the buffer is left.
+  let b:diredit_fresh = 1
+endfunction
+
+" On BufEnter: refresh unless the listing was just rendered or has edits.
+function! diredit#refresh() abort
+  if !exists('b:diredit_dir') || &modified
+    return
+  endif
+  if exists('b:diredit_fresh')
+    unlet b:diredit_fresh
+    return
+  endif
+  call diredit#render()
+  unlet! b:diredit_fresh
 endfunction
 
 " Human readable size: bytes below 1K, then one decimal up to 9.9, then
@@ -330,7 +366,7 @@ function! s:plan() abort
     if l:e.id == 0
       call add(l:creates, {'op': 'create', 'src': '', 'dest': l:dest, 'isdir': l:e.isdir, 'lnum': l:lnum})
     elseif !has_key(s:entries, l:e.id)
-      call add(l:errors, printf('line %d: unknown entry id %d (reload with :e!)', l:lnum, l:e.id))
+      call add(l:errors, printf('line %d: unknown entry id %d (reload with R)', l:lnum, l:e.id))
     else
       if !has_key(l:seen, l:e.id)
         let l:seen[l:e.id] = []
@@ -404,6 +440,7 @@ function! s:plan() abort
     endif
     let l:dests[l:op.dest] = 1
     if s:exists(l:op.dest) && !has_key(l:vacated, l:op.dest)
+          \ && !(l:op.op ==# 'move' && s:same_path(l:op.src, l:op.dest))
       call add(l:errors, printf('line %d: "%s" already exists', l:op.lnum, l:op.dest))
     endif
     if l:op.isdir && !empty(l:op.src) && stridx(l:op.dest . '/', l:op.src . '/') == 0
@@ -504,7 +541,9 @@ function! s:execute_transfers(ops) abort
   while !empty(l:pending)
     let l:progress = 0
     for l:op in copy(l:pending)
-      if s:exists(l:op.dest)
+      " A destination that is the source under another case is not
+      " occupied; rename() handles that change directly.
+      if s:exists(l:op.dest) && !(l:op.op ==# 'move' && s:same_path(l:op.src, l:op.dest))
         continue
       endif
       if l:op.op ==# 'move' && !empty(filter(copy(l:pending),

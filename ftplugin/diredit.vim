@@ -12,7 +12,7 @@ setlocal noexpandtab
 
 nnoremap <buffer> <silent> <CR> <Cmd>call diredit#select()<CR>
 nnoremap <buffer> <silent> -    <Cmd>call diredit#open_parent()<CR>
-nnoremap <buffer> <silent> R    <Cmd>edit!<CR>
+nnoremap <buffer> <silent> R    <Cmd>call diredit#render()<CR>
 nnoremap <buffer> <silent> g.   <Cmd>call diredit#toggle_hidden()<CR>
 nnoremap <buffer> <silent> gl   <Cmd>call diredit#toggle_details()<CR>
 nnoremap <buffer> <silent> g?   <Cmd>call diredit#help()<CR>

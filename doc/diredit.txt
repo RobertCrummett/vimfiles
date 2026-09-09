@@ -48,7 +48,11 @@ permissions column such as `-rw-r--r--` comes first.
 Each line really holds three tab-separated fields: a numeric id, the
 details, and the name. The id and the tabs are concealed. The id is how
 edits are recognised, so leave it alone; if a line loses it, reload with
-`:e!`. Only the first and last fields matter when writing.
+`R`. Only the first and last fields matter when writing.
+
+Building the listing is not an edit: the undo history is dropped each
+time it is drawn, so `u` straight after opening or reloading cannot empty
+the buffer. Edits made afterwards undo as usual.
 
 ==============================================================================
 3. Editing: what each edit means                             *diredit-editing*
@@ -84,12 +88,17 @@ Checks that abort the write, each reported with its line number:
 - a destination that already exists on disk and is not itself being moved
   away or deleted by the same write
 - names containing `.` or `..` components
+- names containing control characters
 - on Windows, names containing `< > : " | ? *`
 - moving or copying a directory into itself
 - an id the plugin does not know (stale or mangled line)
 
 Nothing is applied when a check fails; the buffer stays modified so the
 lines can be fixed.
+
+A rename that only changes case, `Foo.txt` to `foo.txt`, is allowed even
+where the file system ignores case and the destination therefore looks
+like it already exists.
 
 Order of application: deletions first, then moves and copies in whatever
 order leaves their destinations free (a swap of two names goes through a
@@ -107,7 +116,8 @@ Re-entering an unmodified listing re-reads the directory.
 <CR>            Open the entry under the cursor: a file is edited, a
                 directory replaces the listing.
 -               Parent directory, cursor on the directory you came from.
-R               Reload from disk (same as `:e!`).
+R               Re-read the directory and draw the listing again.
+                Unwritten edits are discarded.
 g.              Toggle dotfiles.
 gl              Toggle the details column.
 g?              Show this key summary.
