@@ -20,6 +20,13 @@ autoload/tagsgen.vim.
                         of tags, files and seconds. Completes directory
                         names.
 
+A scan that takes longer than a second says how far it has got, once a
+second: >
+
+    MakeTags: 412 of 1180 files, 9033 tags so far ...
+<
+A quick scan says nothing until the summary.
+
 The file is a standard sorted tags file with the format and sorted-flag
 headers, so |:tag|, |CTRL-]|, |:tselect|, |taglist()| and everything else
 that reads 'tags' works. Entries use the search-pattern form
@@ -34,16 +41,27 @@ Kinds follow ctags: f function, c class, s struct/enum/union/trait,
 t typedef, d macro, v variable, m user command or macro, l label,
 a autocommand group, h heading.
 
-  C, C++          #define, struct/union/enum/class, typedef, function
-                  definitions (including the style with the return type on
-                  the previous line and the name at column 0)
+  C, C++          #define, struct/union/enum/class, `enum class`, typedef
+                  (including the `} name_t;` that closes one written over
+                  several lines), and function definitions: at column 0
+                  with the return type on the previous line, indented ones
+                  inside a class body, and return types carrying scopes or
+                  template arguments, `std::vector<int> f(...)`. In C++
+                  also constructors and destructors, both scoped,
+                  `ns::Widget::Widget(...)`, and inline in the class body,
+                  `Widget(int x) : n(x) {}` and `~Widget()`; a destructor
+                  keeps its `~` in the tag name.
   Rust            fn, struct/enum/union/trait/type/mod, const/static,
                   macro_rules!
   Python          def, class, module-level assignments
   Go              func (methods too), type
-  JavaScript/TS   function, class, const/let/var
+  JavaScript/TS   function, class, const/let/var, and methods of a class
+                  or object literal: `speak() {`, `static create(x) {`,
+                  `constructor(x) {`, with an optional TypeScript return
+                  type
   Lua             function, name = function
-  Vim script      function/def, :command, augroup, global variables
+  Vim script      function, def and export def, :command, augroup, global
+                  variables
   Shell           name() and function name
   PowerShell      function/filter/workflow, class
   Batch           :labels
@@ -60,14 +78,17 @@ a autocommand group, h heading.
 
 Set the options below in the vimrc before the plugin loads; your entries
 are merged with the defaults and win over them. A pattern must isolate the
-tag name with |/\zs| and |/\ze|. An optional third element is a plain
-substring the line must contain, a cheap prefilter for expensive patterns: >
+tag name with |/\zs| and |/\ze|: >
 
     let g:tagsgen_filetypes = {'zig': 'zig'}
     let g:tagsgen_patterns = {
-      \ 'zig': [['^\s*\%(pub\s\+\)\?fn\s\+\zs\h\w*', 'f', 'fn']],
+      \ 'zig': [['^\s*\%(pub\s\+\)\?fn\s\+\zs\h\w*', 'f']],
       \ }
 <
+Every pattern runs over all the lines of a file in one |matchstrlist()|
+call, so there is nothing to gain from a cheaper prefilter. A third list
+element is accepted and ignored, so older entries keep working.
+
 ==============================================================================
 4. Options                                                   *tagsgen-options*
 
@@ -76,9 +97,8 @@ g:tagsgen_filetypes     Dictionary: lowercase extension to filetype.
 
                                                          *g:tagsgen_patterns*
 g:tagsgen_patterns      Dictionary: filetype to a list of
-                        [pattern, kind] or [pattern, kind, needle].
-                        The first pattern in the list that matches a line
-                        owns that line.
+                        [pattern, kind] pairs. The first pattern in the
+                        list that matches a line owns that line.
 
                                                              *g:tagsgen_skip*
 g:tagsgen_skip          Dictionary: filetype to a pattern for lines to
@@ -89,6 +109,8 @@ g:tagsgen_skip          Dictionary: filetype to a pattern for lines to
 g:tagsgen_exclude       List of directory names never descended into.
                         Default: .git .hg .svn node_modules target build
                         __pycache__ .cache
+                        The tree is walked with |readdirex()|, so an
+                        excluded directory is never entered at all.
 
                                                          *g:tagsgen_max_size*
 g:tagsgen_max_size      Files larger than this many bytes are skipped.
@@ -101,6 +123,13 @@ This is regular-expression tagging. There is no parser, so no scopes,
 overload resolution or nested definitions, and a line that looks like a
 definition is tagged even when it is not one. For jumping to definitions in
 your own code it is enough; for library-scale accuracy, ctags is still the
-better tool. Speed is roughly a second per hundred thousand lines.
+better tool.
+
+Symbolic links and junctions are not followed, so a link back up the tree
+cannot send the walk round in circles, and a linked-in directory is not
+scanned.
+
+Measured on C sources, a scan takes about 0.4 to 1 second per hundred
+thousand lines, the denser the definitions the slower.
 
  vim:tw=78:ts=8:ft=help:norl:

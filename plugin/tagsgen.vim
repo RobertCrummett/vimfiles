@@ -32,28 +32,47 @@ let s:filetypes = {
   \ }
 let g:tagsgen_filetypes = extend(s:filetypes, get(g:, 'tagsgen_filetypes', {}))
 
-" Filetype -> list of [pattern, kind] or [pattern, kind, needle]. The
-" pattern must isolate the tag name with \zs and \ze; when a needle is
-" given, lines that do not contain it are not even matched (a cheap
-" prefilter for expensive patterns). Kinds follow ctags: f function,
-" c class, s struct, t typedef, d macro, v variable, m macro/command,
-" l label, a autocommand group, h heading.
+" Filetype -> list of [pattern, kind]. The pattern must isolate the tag
+" name with \zs and \ze; every pattern runs over all lines of a file in one
+" C-speed matchstrlist() call, so there is no cheaper prefilter to add. (A
+" third list element is tolerated and ignored.) Kinds follow ctags:
+" f function, c class, s struct, t typedef, d macro, v variable,
+" m macro/command, l label, a autocommand group, h heading.
 let s:c_ident = '[A-Za-z_][A-Za-z0-9_]*'
 " A statement, not a definition: the line ends in a semicolon.
 let s:not_stmt = '^\%(.*;\s*$\)\@!'
-" Control keywords that look like calls.
-let s:not_kw = '\%(\%(if\|for\|while\|switch\|return\|sizeof\|else\|do\|case\|defined\)\>\)\@!'
-let s:c_quals = '\%(\%(static\|inline\|extern\|const\|unsigned\|signed\|struct\|enum\|union\|class\|virtual\|explicit\|constexpr\|template\s*<[^>]*>\)\s\+\)*'
+" Words that are followed by a parenthesis without naming a function.
+let s:not_kw = '\%(\%(if\|for\|while\|switch\|return\|sizeof\|else\|do\|case\|defined'
+  \ . '\|throw\|catch\|new\|delete\|operator\|alignof\|alignas\|decltype\|typeid\|noexcept'
+  \ . '\|constexpr\|co_await\|co_return\|co_yield\|static_assert\|typeof\)\>\)\@!'
+let s:c_quals = '\%(\%(static\|inline\|extern\|const\|unsigned\|signed\|struct\|enum\|union\|class\|virtual\|explicit\|constexpr\|friend\|template\s*<[^>]*>\)\s\+\)*'
+" A type as it appears before a function name: int, ns::T, std::vector<int>.
+let s:c_type = '\%(' . s:c_ident . '\s*::\s*\)*' . s:c_ident . '\%(\s*<[^<>]*>\)\?'
+" The end of a definition's parameter list, as opposed to a call broken
+" over several lines: the parentheses close on this line and a body or
+" initialiser list follows.
+let s:c_params = '([^;]*)\s*\%(const\s*\)\?\%(noexcept\s*\)\?\%(override\s*\)\?\%({\|:\)'
 let s:patterns = {}
 let s:patterns.c = [
-  \ ['^\s*#\s*define\s\+\zs' . s:c_ident, 'd', '#'],
-  \ ['^\s*\%(typedef\s\+\)\?\%(struct\|union\|enum\|class\)\s\+\zs' . s:c_ident . '\ze\s*\%({\|$\|:\)', 's'],
-  \ ['^\s*typedef\s.*\<\zs' . s:c_ident . '\ze\s*\%(\[[0-9]*\]\)\?\s*;\s*$', 't', 'typedef'],
-  \ ['^\zs' . s:not_kw . s:c_ident . '\ze\s*(\%(.*;\s*$\)\@!', 'f', '('],
-  \ [s:not_stmt . s:c_quals . s:c_ident . '\%(\s*<[^>]*>\)\?\%(\s\|\*\|&\)\+\%(' . s:c_ident . '\s*::\s*\)*'
-  \   . s:not_kw . '\zs' . s:c_ident . '\ze\s*(', 'f', '('],
+  \ ['^\s*#\s*define\s\+\zs' . s:c_ident, 'd'],
+  \ ['^\s*\%(typedef\s\+\)\?\%(enum\s\+\%(class\|struct\)\|struct\|union\|enum\|class\)\s\+\zs' . s:c_ident . '\ze\s*\%({\|$\|:\)', 's'],
+  \ ['^\s*typedef\s.*\<\zs' . s:c_ident . '\ze\s*\%(\[[0-9]*\]\)\?\s*;\s*$', 't'],
+  \ ['^}\s*\zs' . s:c_ident . '\ze\s*;\s*$', 't'],
+  \ ['^\zs' . s:not_kw . s:c_ident . '\ze\s*(\%(\s*\*\)\@!\%(.*;\s*$\)\@!', 'f'],
+  \ ['\%#=1' . s:not_stmt . '\s*' . s:not_kw . s:c_quals . s:c_type . '[ \t*&]\+\%(' . s:c_ident . '\s*::\s*\)*'
+  \   . s:not_kw . '\zs\~\?' . s:c_ident . '\ze\s*(', 'f'],
   \ ]
-let s:patterns.cpp = s:patterns.c
+" \%#=1 on the general function pattern picks the backtracking engine: on
+" 30000 lines of C it took 0.04 s there against 0.2-0.7 s when Vim chose
+" the NFA engine for it, the lookaheads being what the NFA engine handles
+" badly. The pattern is anchored and its repeats do not overlap, so the
+" backtracking engine has nothing to blow up on.
+" C++ adds definitions with no return type: constructors and destructors,
+" scoped (Class::method) at column 0 or inline inside a class body.
+let s:patterns.cpp = s:patterns.c + [
+  \ ['^\s*\%(' . s:c_ident . '\s*::\s*\)\+\zs\~\?' . s:c_ident . '\ze\s*' . s:c_params, 'f'],
+  \ ['^\s\+\%(\%(explicit\|virtual\|inline\|constexpr\)\s\+\)*\zs\~\?[A-Z][A-Za-z0-9_]*\ze\s*' . s:c_params, 'f'],
+  \ ]
 
 " Lines to ignore entirely, per filetype (comments, mostly).
 let g:tagsgen_skip = extend({
@@ -78,10 +97,13 @@ let s:patterns.go = [
   \ ['^func\s\+\%((\s*\w\+\s\+\*\?\w\+\s*)\s\+\)\?\zs' . s:c_ident, 'f'],
   \ ['^type\s\+\zs' . s:c_ident, 't'],
   \ ]
+let s:js_not_kw = '\%(\%(if\|for\|while\|switch\|return\|catch\|function\|else\|do\|await\|yield\|typeof\|new\|super\)\>\)\@!'
 let s:patterns.javascript = [
   \ ['^\s*\%(export\s\+\)\?\%(default\s\+\)\?\%(async\s\+\)\?function\s\+\zs' . s:c_ident, 'f'],
   \ ['^\s*\%(export\s\+\)\?class\s\+\zs' . s:c_ident, 'c'],
   \ ['^\s*\%(export\s\+\)\?\%(const\|let\|var\)\s\+\zs' . s:c_ident . '\ze\s*=', 'v'],
+  \ ['^\s\+\%(\%(static\|async\|get\|set\)\s\+\)*' . s:js_not_kw . '\zs' . s:c_ident
+  \   . '\ze\s*([^()]*)\s*\%(:\s*[^{]\{-}\)\?{', 'f'],
   \ ]
 let s:patterns.lua = [
   \ ['^\s*\%(local\s\+\)\?function\s\+\zs[A-Za-z_][A-Za-z0-9_.:]*', 'f'],
@@ -89,7 +111,7 @@ let s:patterns.lua = [
   \ ]
 let s:patterns.vim = [
   \ ['^\s*fu\%[nction]!\?\s\+\%(<[sS][iI][dD]>\|[sgl]:\)\?\zs[A-Za-z_][A-Za-z0-9_#.]*', 'f'],
-  \ ['^\s*def!\?\s\+\%([sg]:\)\?\zs[A-Za-z_][A-Za-z0-9_#.]*', 'f'],
+  \ ['^\s*\%(export\s\+\)\?def!\?\s\+\%([sg]:\)\?\zs[A-Za-z_][A-Za-z0-9_#.]*', 'f'],
   \ ['^\s*com\%[mand]!\?\s\+\%(-\S\+\s\+\)*\zs[A-Z][A-Za-z0-9_]*', 'm'],
   \ ['^\s*aug\%[roup]\s\+\zs\%(END\>\)\@!\S\+', 'a'],
   \ ['^\s*let\s\+g:\zs[A-Za-z_][A-Za-z0-9_#]*', 'v'],
