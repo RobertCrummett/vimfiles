@@ -1,7 +1,7 @@
 " matlabdoc: read Matlab's own help text without leaving Vim.
 "
 "   :MatlabDoc [name]    help for {name}, or for the word under the cursor
-"   :MatlabDocIndex      (re)build the offline index; takes about two minutes
+"   :MatlabDocIndex      (re)build the offline index; about a minute and a half
 "   :MatlabDocStatus     when the index was built and how much it holds
 "   :MatlabDocClear      forget answers Matlab was asked for live
 "

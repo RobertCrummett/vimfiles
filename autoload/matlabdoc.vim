@@ -16,6 +16,10 @@ let s:root = expand('<sfile>:p:h:h')
 let s:cache = {}       " name -> lines, for answers Matlab was asked for live
 let s:job = v:null
 let s:want = {}        " the live request in flight: name, key, lines
+let s:lastdir = ''     " the last real file's directory, for lookups made
+                       " from a scratch buffer
+let s:seq = 0          " request number, so a reply that arrives after its
+                       " request was replaced can be told apart
 
 " ------------------------------------------------------------ matlab
 
@@ -36,9 +40,21 @@ endfunction
 
 " Matlab resolves names against its own current directory, so start it in the
 " directory of the file being read to reach the .m files sitting beside it.
+"
+" The report window is a scratch buffer with no file of its own, and so is
+" matlabserver's output window, where K on a function your code named is the
+" whole point. Taking expand('%:p:h') there gives Vim's own directory and the
+" answer comes back "not found", so the directory of the last file a lookup
+" was made from is remembered and used instead.
 function! s:startdir() abort
-  let l:dir = expand('%:p:h')
-  return isdirectory(l:dir) ? l:dir : getcwd()
+  if empty(&buftype) && !empty(bufname('%'))
+    let l:dir = expand('%:p:h')
+    if isdirectory(l:dir)
+      let s:lastdir = l:dir
+      return l:dir
+    endif
+  endif
+  return isdirectory(s:lastdir) ? s:lastdir : getcwd()
 endfunction
 
 function! s:dir() abort
@@ -93,7 +109,7 @@ endfunction
 function! matlabdoc#index_status() abort
   let l:stamp = s:index_dir() . '/.stamp'
   if !filereadable(l:stamp)
-    echo 'matlabdoc: no index yet; run :MatlabDocIndex (about two minutes, once)'
+    echo 'matlabdoc: no index yet; run :MatlabDocIndex (about a minute and a half, once)'
     return
   endif
   let l:n = len(glob(s:index_dir() . '/*.txt', 0, 1))
@@ -104,6 +120,11 @@ function! matlabdoc#index_status() abort
 endfunction
 
 function! s:index_done(job, status) abort
+  " Only the job still on the books may clear what is on the books; an exit
+  " that arrives after this one was replaced has nothing left to say.
+  if a:job isnot s:job
+    return
+  endif
   let s:job = v:null
   let s:want = {}
   redraw
@@ -143,19 +164,23 @@ function! matlabdoc#index() abort
     echohl NONE
     return
   endif
-  echo 'matlabdoc: building the index in the background, about two minutes; '
+  echo 'matlabdoc: building the index in the background, about a minute and a half; '
     \ . 'carry on, you will be told when it is done'
 endfunction
 
 " ------------------------------------------------------------ lookup
 
-function! s:live_done(job, status) abort
+" Called with the request number bound, because a job is only refused while
+" it is running: a lookup asked for between one finishing and its exit
+" callback running starts a second job, and the first callback would then
+" show its own answer and throw the second request's away.
+function! s:live_done(id, job, status) abort
   let l:w = s:want
-  let s:job = v:null
-  let s:want = {}
-  if empty(l:w)
+  if get(l:w, 'id', -1) != a:id
     return
   endif
+  let s:job = v:null
+  let s:want = {}
   while !empty(l:w.lines) && empty(trim(l:w.lines[-1]))
     call remove(l:w.lines, -1)
   endwhile
@@ -176,8 +201,10 @@ function! s:live_done(job, status) abort
   call s:show(l:w.name, 'matlab -batch, just now', l:w.lines)
 endfunction
 
-function! s:collect(ch, msg) abort
-  if !empty(s:want)
+" Same guard: Vim may deliver a job's last output after its exit callback, and
+" that tail must not be appended to the answer of whatever was asked next.
+function! s:collect(id, ch, msg) abort
+  if get(s:want, 'id', -1) == a:id
     call add(s:want.lines, substitute(a:msg, '\r$', '', ''))
   endif
 endfunction
@@ -199,12 +226,14 @@ function! s:live(name) abort
     return
   endif
   let l:key = s:startdir() . "\n" . a:name
-  let s:want = {'name': a:name, 'key': l:key, 'lines': []}
+  let s:seq += 1
+  let s:want = {'id': s:seq, 'name': a:name, 'key': l:key, 'lines': []}
   " A list, not a string: Vim passes the arguments through without a shell, so
   " the name needs no quoting. -batch keeps Matlab headless and exits after.
   let s:job = job_start([l:exe, '-sd', s:startdir(), '-batch', 'help ' . a:name],
-    \ {'in_io': 'null', 'out_cb': function('s:collect'), 'err_cb': function('s:collect'),
-    \  'exit_cb': function('s:live_done')})
+    \ {'in_io': 'null', 'out_cb': function('s:collect', [s:seq]),
+    \  'err_cb': function('s:collect', [s:seq]),
+    \  'exit_cb': function('s:live_done', [s:seq])})
   if job_status(s:job) !=# 'run'
     let s:job = v:null
     let s:want = {}
@@ -225,13 +254,18 @@ function! matlabdoc#open(name) abort
     return
   endif
 
+  " Where the lookup was made from, noted before the index answers and
+  " returns: a K in the report window that follows this one has no file of
+  " its own to take a directory from, and s:startdir() remembers this.
+  let l:dir = s:startdir()
+
   let l:lines = s:from_index(l:name)
   if !empty(l:lines)
     call s:show(l:name, 'index, built ' . s:built_when(), l:lines)
     return
   endif
 
-  let l:key = s:startdir() . "\n" . l:name
+  let l:key = l:dir . "\n" . l:name
   if has_key(s:cache, l:key)
     call s:show(l:name, 'matlab -batch, earlier this session', s:cache[l:key])
     return

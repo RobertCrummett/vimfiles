@@ -38,10 +38,12 @@ matlab/build_index.m.
                         session. The index is not touched.
 
                                                               *matlabdoc-K*
-K                       Mapped to |:MatlabDoc| in matlab and octave buffers
-                        through 'keywordprg', so K on `exp` opens Matlab's
-                        help for `exp`. The report window sets it too, so K
-                        on a name in a `See also` line follows it.
+K                       Set to |:MatlabDoc| through 'keywordprg' in matlab
+                        buffers by after/ftplugin/matlab.vim and in octave
+                        buffers by after/ftplugin/octave.vim, so K on `exp`
+                        opens Matlab's help for `exp`. The report window
+                        sets it too, so K on a name in a `See also` line
+                        follows it.
 
 ==============================================================================
 2. The index                                                 *matlabdoc-index*

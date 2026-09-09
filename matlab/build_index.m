@@ -46,15 +46,27 @@ for k = 1:numel(names)
         continue
     end
     target = fullfile(outDir, [lower(name) '.txt']);
-    if isKey(seen, lower(name))
+    % A name whose file is already there is one of the pairs that differ only
+    % in case, so this entry is appended after a rule rather than replacing
+    % the first. The handle is checked before anything is written to it:
+    % fprintf on a failed fopen raises, which would end the build.
+    %
+    % Nothing here may be named after a documented function: a variable
+    % shadows one, and help() then answers "x is a variable of type ..."
+    % instead of the help text, quietly ruining that one entry.
+    collides = isKey(seen, lower(name));
+    if collides
         fid = fopen(target, 'a', 'n', 'UTF-8');
-        fprintf(fid, '\n%s\n', repmat('-', 1, 70));
     else
         fid = fopen(target, 'w', 'n', 'UTF-8');
-        seen(lower(name)) = true;
     end
     if fid < 0
         continue
+    end
+    if collides
+        fprintf(fid, '\n%s\n', repmat('-', 1, 70));
+    else
+        seen(lower(name)) = true;
     end
     fprintf(fid, '%s', s);
     fclose(fid);
@@ -64,9 +76,14 @@ for k = 1:numel(names)
     end
 end
 
+% datetime rather than datestr(now): datestr is the one MathWorks marks not
+% recommended, and warnings are off here, so the day it goes it would raise
+% instead - after the whole index had been written, leaving it with no stamp
+% and :MatlabDocStatus reporting no index at all.
 fid = fopen(fullfile(outDir, '.stamp'), 'w', 'n', 'UTF-8');
 fprintf(fid, 'matlabroot %s\nversion %s\nnames %d\nbuilt %s\n', ...
-    matlabroot, version, written, datestr(now, 'yyyy-mm-dd HH:MM:SS'));
+    matlabroot, version, written, ...
+    char(datetime('now', 'Format', 'yyyy-MM-dd HH:mm:ss')));
 fclose(fid);
 
 fprintf('build_index: wrote %d files to %s in %.0f s\n', written, outDir, toc(t));
