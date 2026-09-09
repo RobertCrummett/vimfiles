@@ -69,6 +69,10 @@ Many words at once ~
                         .tex .typ .md .txt .bib .rst .org). Words already in
                         words.txt or reject.txt are not listed, nor words
                         seen fewer than |g:geospell_min_count| times.
+                        Listed words follow Vim's case rule, so a word a
+                        lowercase entry already covers - `Magnetotelluric`
+                        opening a sentence against `magnetotelluric` in
+                        words.txt - is not offered either.
                         Without {paths} the corpus directory is scanned.
 
                         In the review buffer, delete the lines you do not
@@ -151,6 +155,12 @@ g:geospell_min_count    Minimum occurrences for a harvested word to be
                                                           *g:geospell_sources*
 g:geospell_sources      List of paths scanned by |:GeoSpellHarvest| when no
                         paths are given. Default: the corpus directory.
+
+                                                   *g:geospell_max_file_size*
+g:geospell_max_file_size
+                        Files bigger than this many bytes are not harvested,
+                        which keeps data files that happen to be named .txt
+                        out. Default 3 MiB.
 
 ==============================================================================
 7. How the build works                                        *geospell-build*

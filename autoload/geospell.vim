@@ -204,9 +204,17 @@ endfunction
 " Scan sources for words the base language does not know. Returns a dict
 " word -> count, ignoring words already in words.txt or reject.txt.
 function! geospell#candidates(sources) abort
+  " Known words, by Vim's own rule: a lowercase entry also covers its
+  " capitalised and all-capitals forms, so "Magnetotelluric" opening a
+  " sentence is not a candidate when "magnetotelluric" is listed. An entry
+  " with capitals covers only itself.
   let l:known = {}
+  let l:known_lower = {}
   for l:w in geospell#words() + s:read_list(s:reject_file)
     let l:known[l:w] = 1
+    if l:w ==# tolower(l:w)
+      let l:known_lower[l:w] = 1
+    endif
   endfor
   let l:files = []
   for l:src in a:sources
@@ -237,7 +245,7 @@ function! geospell#candidates(sources) abort
     for l:file in l:files
       for l:line in readfile(l:file)
         for l:t in s:tokens(l:line)
-          if has_key(l:known, l:t)
+          if has_key(l:known, l:t) || has_key(l:known_lower, tolower(l:t))
             continue
           endif
           if !has_key(l:verdict, l:t)
@@ -296,7 +304,8 @@ function! geospell#accept() abort
       call add(l:new, l:w)
     endif
   endfor
-  close
+  " Wipe rather than :close, which refuses when this is the last window.
+  bwipeout!
   call geospell#add_list(l:new)
   echomsg printf('geospell: accepted %d words; %d in words.txt', len(l:new), len(geospell#words()))
 endfunction
