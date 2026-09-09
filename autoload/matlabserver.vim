@@ -1,6 +1,6 @@
 " One Matlab session, kept alive and spoken to over a loopback socket, so
 " running something costs milliseconds instead of the five seconds Matlab
-" needs to start. matlabserver/server.m is the other half.
+" needs to start. matlab/server.m is the other half.
 "
 " This session is its own process with its own workspace. It does not share
 " anything with a Matlab desktop you have open, which is the point: the
@@ -17,7 +17,7 @@ let s:reply = []            " lines collected for the command in flight
 let s:pending = {}          " what that command was
 
 function! s:dir() abort
-  return s:root . '/matlabserver'
+  return s:root . '/matlab'
 endfunction
 
 function! s:port() abort
@@ -94,6 +94,44 @@ function! matlabserver#start() abort
   echo printf('matlabserver: starting Matlab, ready in a few seconds '
     \ . '(:MatlabStatus to check; it closes itself after %d min idle)',
     \ s:idle() / 60)
+endfunction
+
+" Make sure a session is up and answering, starting one and waiting for it if
+" not. :make is synchronous, so blocking here is what the caller expects; the
+" wait is only paid on the first :make of a Vim session.
+function! matlabserver#ensure(timeout_ms) abort
+  if matlabserver#eval_sync('1', 500).ok
+    return 1
+  endif
+  if !matlabserver#running()
+    call matlabserver#start()
+  endif
+  let l:start = reltime()
+  while reltimefloat(reltime(l:start)) * 1000 < a:timeout_ms
+    if !matlabserver#running()
+      break
+    endif
+    if matlabserver#eval_sync('1', 500).ok
+      redraw
+      echo printf('matlabserver: ready after %.0f s',
+        \ reltimefloat(reltime(l:start)))
+      return 1
+    endif
+  endwhile
+  call s:err('the session did not come up within '
+    \ . (a:timeout_ms / 1000) . ' s; see ' . s:dir() . '/server.log')
+  return 0
+endfunction
+
+" Let go of our connection without stopping the session. server.m serves one
+" client at a time, so while Vim holds the socket nothing else can be served:
+" :make shells out to matlab/mlmake.py, which needs the server free. The next
+" eval reconnects on its own.
+function! matlabserver#release() abort
+  if s:ch isnot v:null && ch_status(s:ch) ==# 'open'
+    call ch_close(s:ch)
+  endif
+  let s:ch = v:null
 endfunction
 
 function! matlabserver#stop() abort
@@ -190,7 +228,7 @@ function! s:show(title, res) abort
   let l:lines = empty(a:res.lines) ? ['(no output)'] : a:res.lines
   call setline(1, l:lines)
   setlocal nomodified nomodifiable
-  setlocal filetype=matlabserver
+  setlocal filetype=matlabout
   normal! gg
 endfunction
 
@@ -241,3 +279,21 @@ augroup matlabserver_exit
   autocmd!
   autocmd VimLeavePre * if matlabserver#running() | call matlabserver#stop() | endif
 augroup END
+
+" Called from QuickFixCmdPre, for every :make in any buffer, so it has to
+" decide whether this one is ours.
+function! matlabserver#make_pre() abort
+  if &filetype !=# 'matlab' && &filetype !=# 'octave'
+    return
+  endif
+  if &modified && !empty(bufname('%'))
+    silent update
+  endif
+  if !matlabserver#ensure(get(g:, 'matlabserver_start_timeout', 30000))
+    return
+  endif
+  " mlmake.py is about to connect, and the session only talks to one client
+  " at a time.
+  call matlabserver#release()
+endfunction
+

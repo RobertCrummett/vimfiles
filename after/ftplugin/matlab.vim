@@ -21,7 +21,11 @@ let g:MATLAB_function_indent = 0
 " and takes a few seconds; :MatlabDocIndex removes that for good.
 setlocal keywordprg=:MatlabDoc
 
+" :make runs this file in the warm Matlab session and puts any error in the
+" quickfix list. See compiler/matlab.vim and |matlabserver-make|.
+compiler matlab
+
 " Add to the runtime file's undo command rather than replacing it, so
 " :setfiletype something-else still restores everything.
 let b:undo_ftplugin = (empty(get(b:, 'undo_ftplugin', '')) ? '' : b:undo_ftplugin . ' | ')
-  \ . 'setlocal shiftwidth< softtabstop< keywordprg<'
+  \ . 'setlocal shiftwidth< softtabstop< keywordprg< makeprg< errorformat<'

@@ -1,6 +1,6 @@
 " Matlab needs about five seconds to start, so asking it a question per
-" lookup is not an option. matlabdoc/build_index.m runs it once and writes
-" every documented function's help text to matlabdoc/index/, and a lookup is
+" lookup is not an option. matlab/build_index.m runs it once and writes
+" every documented function's help text to matlab/index/, and a lookup is
 " then a file read. Matlab is only started again to rebuild that index, or for
 " a name it does not cover.
 "
@@ -42,7 +42,7 @@ function! s:startdir() abort
 endfunction
 
 function! s:dir() abort
-  return s:root . '/matlabdoc'
+  return s:root . '/matlab'
 endfunction
 
 function! s:index_dir() abort
@@ -78,7 +78,7 @@ function! s:show(name, source, lines) abort
   execute 'silent keepalt file' fnameescape(l:try)
   call setline(1, a:lines + ['', repeat('-', 70), 'source: ' . a:source])
   setlocal nomodified nomodifiable
-  setlocal filetype=matlabdoc
+  setlocal filetype=matlabout
   normal! gg
 endfunction
 

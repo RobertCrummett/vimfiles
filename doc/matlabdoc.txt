@@ -5,7 +5,7 @@ Looks a Matlab function up and shows its help in a window you can search and
 yank from. Answers come from an index built once from the local Matlab
 installation, so a lookup is a file read rather than a five second wait.
 Lives in plugin/matlabdoc.vim, autoload/matlabdoc.vim and
-matlabdoc/build_index.m.
+matlab/build_index.m.
 
 1. Commands                                     |matlabdoc-commands|
 2. The index                                    |matlabdoc-index|
@@ -50,9 +50,9 @@ Matlab needs about five seconds to start. That is the cost of `matlab -batch`
 and it is paid every time, which is far too slow to sit behind K. So Matlab
 is started once and asked about everything at once.
 
-matlabdoc/build_index.m reads the function list out of >
+matlab/build_index.m reads the function list out of >
     matlabroot/help/matlab/helpfuncbycat.xml
-<and writes each function's help text to matlabdoc/index/{name}.txt. On this
+<and writes each function's help text to matlab/index/{name}.txt. On this
 machine that is 2287 entries in 2281 files, about 7 MB, built in 81 seconds.
 Six names differ only in case (Combine and combine, Feval and feval, and so
 on); Windows filenames do not, so those pairs share a file and both entries
@@ -62,7 +62,7 @@ Operators (`+`, `.*`, `==`) and multi-word entries ("App Designer") are
 skipped. They are not words you can put the cursor on, and |:MatlabDoc|
 rejects them anyway.
 
-The index is generated, so .gitignore keeps matlabdoc/index/ out of the
+The index is generated, so .gitignore keeps matlab/index/ out of the
 history; build_index.m itself is tracked. It is a snapshot of one Matlab
 release, so run |:MatlabDocIndex| again after upgrading.
 
@@ -93,6 +93,9 @@ the window closes. A second lookup reuses the window.
 q                       Close the report.
 K                       Look up the name under the cursor, so `See also`
                         lines can be followed.
+
+The window takes the filetype "matlabout", shared with |matlabserver|'s
+output window; ftplugin/matlabout.vim carries the behaviour for both.
 
 The last line says where the text came from: the index and when it was
 built, an answer Matlab gave earlier this session, or a live call just made.

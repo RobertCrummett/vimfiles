@@ -4,13 +4,14 @@
 Keeps a Matlab session alive in the background and talks to it over a
 loopback socket, so running something costs milliseconds instead of the five
 seconds Matlab needs to start. Lives in plugin/matlabserver.vim,
-autoload/matlabserver.vim and matlabserver/server.m.
+autoload/matlabserver.vim and matlab/server.m.
 
 1. Commands                                     |matlabserver-commands|
 2. The session                                  |matlabserver-session|
-3. When it closes                               |matlabserver-idle|
-4. Output                                       |matlabserver-output|
-5. Settings                                     |matlabserver-settings|
+3. :make and the quickfix list                  |matlabserver-make|
+4. When it closes                               |matlabserver-idle|
+5. Output                                       |matlabserver-output|
+6. Settings                                     |matlabserver-settings|
 
 ==============================================================================
 1. Commands                                            *matlabserver-commands*
@@ -66,7 +67,49 @@ loopback only and refuses anything else, because it evaluates whatever it is
 sent.
 
 ==============================================================================
-3. When it closes                                          *matlabserver-idle*
+3. :make and the quickfix list                             *matlabserver-make*
+
+In a matlab or octave buffer |:make| runs the current file in the session and
+puts anything that raised into the quickfix list, so |:clist|, |:cnext| and
+|:cc| walk the error the usual way. after/ftplugin/matlab.vim selects
+compiler/matlab.vim for this; nothing else has to be set up. >
+
+    :make
+    :clist
+       1 helper.m:2: Undefined function 'nosuchfunction' for input ...
+       2 bad.m:2: called from bad
+<
+The first :make of a Vim session starts Matlab and takes a couple of seconds.
+Every one after that is about 0.2 s, nearly all of it Python's startup.
+
+Three things happen before :make shells out, from a |QuickFixCmdPre| hook:
+
+  - The buffer is written if it is modified. :make on a stale file is a trap,
+    and Vim's own answer to it, 'autowrite', is a global setting this plugin
+    should not turn on for you.
+
+  - The session is started if it is not running, and waited for. :make is
+    synchronous, so waiting is what you would expect; |g:matlabserver_start_timeout|
+    caps it.
+
+  - Vim's own connection is dropped. server.m serves one client at a time, so
+    the socket has to be free for the program :make runs. The next |:Matlab|
+    reconnects on its own.
+
+'makeprg' runs matlab/mlmake.py, because :make goes through the shell and
+cannot speak to the socket itself. The script only relays: server.m already
+reports errors as `file:line: message`, which is what 'errorformat' reads, so
+nothing parses Matlab output on the Vim side. Errors name the innermost frame
+first, then each caller, so :cnext walks out of the stack.
+
+Note for anyone editing compiler/matlab.vim: the paths there are quoted by
+hand with forward slashes rather than through |shellescape()| and `%:p:S`.
+With 'shell' set to bash and 'shellslash' off, shellescape() reads the
+backslashes of a Windows path as escapes and drops them, turning
+`C:\a b\c.py` into `"C:a bc.py"`.
+
+==============================================================================
+4. When it closes                                          *matlabserver-idle*
 
 A forgotten session would hold several hundred megabytes for the rest of the
 day, so it closes itself. It shuts down after |g:matlabserver_idle| seconds
@@ -83,7 +126,7 @@ Vim normally shuts the session down through |VimLeavePre| as well, which
 lets Matlab quit in its own time instead of being cut off.
 
 ==============================================================================
-4. Output                                                *matlabserver-output*
+5. Output                                                *matlabserver-output*
 
 Output of one or two lines is echoed on the status line. Anything longer, or
 anything that raised, opens a split above the current window: read-only,
@@ -91,6 +134,11 @@ unlisted, wiped when closed, and reused by the next command.
 
 q                       Close the output window.
 K                       Look the name under the cursor up with |:MatlabDoc|.
+
+Both this window and |matlabdoc|'s help window take the filetype "matlabout",
+so ftplugin/matlabout.vim carries that behaviour once rather than each plugin
+repeating it. It is a scratch buffer type, not a real file type, the same way
+diredit and synexplore are.
 
 Errors are reported as Matlab's message plus the frames from your own code.
 The `evalc` and server.m frames that carry the command are dropped, as are
@@ -101,7 +149,7 @@ writes for its own desktop, and the backspaces it pads warning text with. >
     type 'double'.
 <
 ==============================================================================
-5. Settings                                            *matlabserver-settings*
+6. Settings                                            *matlabserver-settings*
 
                                                        *g:matlabserver_port*
 g:matlabserver_port     Loopback port to listen on. Default 51763.
@@ -115,6 +163,15 @@ g:matlabserver_idle     Seconds of quiet before the session closes itself.
 g:matlabserver_timeout  How long to wait for a reply, in milliseconds.
                         Default 60000. Raise it if you run something slow
                         with |:MatlabRun|.
+
+                                             *g:matlabserver_start_timeout*
+g:matlabserver_start_timeout
+                        How long |:make| waits for a session to come up, in
+                        milliseconds. Default 30000.
+
+                                                     *g:matlabserver_python*
+g:matlabserver_python   The python that runs matlab/mlmake.py for |:make|.
+                        Default "python".
 
 g:matlabdoc_program     Which matlab.exe to run, shared with |matlabdoc|.
                         Documented at |g:matlabdoc_program|.

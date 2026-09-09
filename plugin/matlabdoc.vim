@@ -9,9 +9,9 @@
 " opens Matlab's help for exp.
 "
 " Matlab needs about five seconds to start, which is too slow to pay per
-" lookup, so it is run once: matlabdoc/build_index.m walks every function in
+" lookup, so it is run once: matlab/build_index.m walks every function in
 " matlabroot/help/matlab/helpfuncbycat.xml and writes its help text to
-" matlabdoc/index/. A lookup is then a file read. Names the index misses -
+" matlab/index/. A lookup is then a file read. Names the index misses -
 " your own functions, mostly - fall back to "matlab -batch help {name}" in a
 " background job, cached for the session.
 "
