@@ -1,0 +1,110 @@
+*matlabdoc.txt*   Matlab's own help text, without leaving Vim   *matlabdoc-plugin*
+
+                                              *matlabdoc* *plugin-matlabdoc*
+Looks a Matlab function up and shows its help in a window you can search and
+yank from. Answers come from an index built once from the local Matlab
+installation, so a lookup is a file read rather than a five second wait.
+Lives in plugin/matlabdoc.vim, autoload/matlabdoc.vim and
+matlabdoc/build_index.m.
+
+1. Commands                                     |matlabdoc-commands|
+2. The index                                    |matlabdoc-index|
+3. The report window                            |matlabdoc-window|
+4. Settings                                     |matlabdoc-settings|
+
+==============================================================================
+1. Commands                                               *matlabdoc-commands*
+
+                                                                 *:MatlabDoc*
+:MatlabDoc              Help for the word under the cursor.
+:MatlabDoc {name}       Help for {name}. Read from the index when it is
+                        there, which is the usual case and takes a few
+                        milliseconds. Otherwise Matlab is asked directly in
+                        a background job, which takes a few seconds and is
+                        remembered for the rest of the session.
+
+                                                            *:MatlabDocIndex*
+:MatlabDocIndex         Build the index, or rebuild it after a Matlab
+                        upgrade. Runs Matlab in the background for about
+                        ninety seconds and says when it is done; Vim stays
+                        usable throughout. See |matlabdoc-index|.
+
+                                                           *:MatlabDocStatus*
+:MatlabDocStatus        How many functions the index holds, which Matlab
+                        release and matlabroot it was built from, and when.
+
+                                                            *:MatlabDocClear*
+:MatlabDocClear         Forget the answers Matlab was asked for live this
+                        session. The index is not touched.
+
+                                                              *matlabdoc-K*
+K                       Mapped to |:MatlabDoc| in matlab and octave buffers
+                        through 'keywordprg', so K on `exp` opens Matlab's
+                        help for `exp`. The report window sets it too, so K
+                        on a name in a `See also` line follows it.
+
+==============================================================================
+2. The index                                                 *matlabdoc-index*
+
+Matlab needs about five seconds to start. That is the cost of `matlab -batch`
+and it is paid every time, which is far too slow to sit behind K. So Matlab
+is started once and asked about everything at once.
+
+matlabdoc/build_index.m reads the function list out of >
+    matlabroot/help/matlab/helpfuncbycat.xml
+<and writes each function's help text to matlabdoc/index/{name}.txt. On this
+machine that is 2287 entries in 2281 files, about 7 MB, built in 81 seconds.
+Six names differ only in case (Combine and combine, Feval and feval, and so
+on); Windows filenames do not, so those pairs share a file and both entries
+are written into it.
+
+Operators (`+`, `.*`, `==`) and multi-word entries ("App Designer") are
+skipped. They are not words you can put the cursor on, and |:MatlabDoc|
+rejects them anyway.
+
+The index is generated, so .gitignore keeps matlabdoc/index/ out of the
+history; build_index.m itself is tracked. It is a snapshot of one Matlab
+release, so run |:MatlabDocIndex| again after upgrading.
+
+Two faster-looking routes do not work and were tried:
+
+  - The offline HTML documentation is not installed here.
+    matlabroot/help/matlab/ref is empty, leaving only a search index.
+
+  - Reading the .m files under matlabroot directly is wrong. Only about 62%
+    of documented functions have an .m file at all, most core functions
+    being compiled, and the basename that does exist is usually a class
+    method overload: exp.m under @tabular, plot.m under @tall, zeros.m under
+    @codistributed. Their help is not the help you asked for.
+
+Names the index does not cover fall through to `matlab -batch help {name}`,
+run as a background job so Vim never blocks, with Matlab started in the
+current file's directory so functions you wrote are found. If
+|matlabserver| is running it is not consulted; the two plugins share only
+|g:matlabdoc_program|.
+
+==============================================================================
+3. The report window                                        *matlabdoc-window*
+
+Help opens in a split above the current window, read-only and unlisted, kept
+out of the jumplist and the alternate-file history. The buffer is wiped when
+the window closes. A second lookup reuses the window.
+
+q                       Close the report.
+K                       Look up the name under the cursor, so `See also`
+                        lines can be followed.
+
+The last line says where the text came from: the index and when it was
+built, an answer Matlab gave earlier this session, or a live call just made.
+
+==============================================================================
+4. Settings                                               *matlabdoc-settings*
+
+                                                       *g:matlabdoc_program*
+g:matlabdoc_program     Which matlab.exe to run. Unset, the plugin takes the
+                        first `matlab` on $PATH, and failing that the newest
+                        release matching >
+                            C:/Program Files/MATLAB/R*/bin/matlab.exe
+<                       Shared with |matlabserver|.
+
+ vim:tw=78:ts=8:ft=help:norl:

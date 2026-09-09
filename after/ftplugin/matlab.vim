@@ -16,7 +16,12 @@ setlocal softtabstop=-1
 " which would overwrite a buffer-local set here.
 let g:MATLAB_function_indent = 0
 
+" K opens Matlab's own help for the word under the cursor, out of the index
+" plugin/matlabdoc.vim builds. Without an index the first lookup starts Matlab
+" and takes a few seconds; :MatlabDocIndex removes that for good.
+setlocal keywordprg=:MatlabDoc
+
 " Add to the runtime file's undo command rather than replacing it, so
 " :setfiletype something-else still restores everything.
 let b:undo_ftplugin = (empty(get(b:, 'undo_ftplugin', '')) ? '' : b:undo_ftplugin . ' | ')
-  \ . 'setlocal shiftwidth< softtabstop<'
+  \ . 'setlocal shiftwidth< softtabstop< keywordprg<'
