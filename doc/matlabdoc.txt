@@ -19,9 +19,11 @@ matlab/build_index.m.
 :MatlabDoc              Help for the word under the cursor.
 :MatlabDoc {name}       Help for {name}. Read from the index when it is
                         there, which is the usual case and takes a few
-                        milliseconds. Otherwise Matlab is asked directly in
-                        a background job, which takes a few seconds and is
-                        remembered for the rest of the session.
+                        milliseconds. Otherwise the warm |matlabserver|
+                        session is asked, if there is one, which takes
+                        about as long; failing that Matlab is started in a
+                        background job, which takes a few seconds. Either
+                        way the answer is remembered for the session.
 
                                                             *:MatlabDocIndex*
 :MatlabDocIndex         Build the index, or rebuild it after a Matlab
@@ -78,11 +80,16 @@ Two faster-looking routes do not work and were tried:
     method overload: exp.m under @tabular, plot.m under @tall, zeros.m under
     @codistributed. Their help is not the help you asked for.
 
-Names the index does not cover fall through to `matlab -batch help {name}`,
+Names the index does not cover are asked of the |matlabserver| session when
+one is running, which answers in milliseconds: the lookup steps into the
+file's directory, calls help, and steps back, so functions you wrote are
+found and the session's own directory is left as it was.
+|g:matlabdoc_session_timeout| bounds the wait. Without a session, or if it
+does not answer, they fall through to `matlab -batch help {name}`,
 run as a background job so Vim never blocks, with Matlab started in the
-current file's directory so functions you wrote are found. If
-|matlabserver| is running it is not consulted; the two plugins share only
-|g:matlabdoc_program|.
+current file's directory so functions you wrote are found. Either answer is
+remembered for the rest of the session, except "not found", which may
+change once the file is saved or the path does.
 
 ==============================================================================
 3. The report window                                        *matlabdoc-window*
@@ -99,7 +106,8 @@ The window takes the filetype "matlabout", shared with |matlabserver|'s
 output window; ftplugin/matlabout.vim carries the behaviour for both.
 
 The last line says where the text came from: the index and when it was
-built, an answer Matlab gave earlier this session, or a live call just made.
+built, the session or a `matlab -batch` call just made, or an answer given
+earlier this session.
 
 ==============================================================================
 4. Settings                                               *matlabdoc-settings*
@@ -110,5 +118,12 @@ g:matlabdoc_program     Which matlab.exe to run. Unset, the plugin takes the
                         release matching >
                             C:/Program Files/MATLAB/R*/bin/matlab.exe
 <                       Shared with |matlabserver|.
+
+                                               *g:matlabdoc_session_timeout*
+g:matlabdoc_session_timeout
+                        How long a lookup waits for the |matlabserver|
+                        session, in milliseconds, before starting
+                        `matlab -batch` instead. Default 5000. A session
+                        busy with a long command is what runs it out.
 
  vim:tw=78:ts=8:ft=help:norl:

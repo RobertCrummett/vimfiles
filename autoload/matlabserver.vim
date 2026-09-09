@@ -11,6 +11,9 @@
 let s:root = expand('<sfile>:p:h:h')
 
 let s:sentinel = '--MATLABSERVER-DONE--'
+" The command sent to see whether the session answers. Not "1": that is an
+" expression, and every ping would set ans in the user's workspace.
+let s:ping = "disp('')"
 let s:job = v:null          " the matlab process running server.m
 let s:ch = v:null           " the channel to it
 let s:reply = []            " lines collected for the command in flight
@@ -123,7 +126,7 @@ endfunction
 " not. :make is synchronous, so blocking here is what the caller expects; the
 " wait is only paid on the first :make of a Vim session.
 function! matlabserver#ensure(timeout_ms) abort
-  if matlabserver#eval_sync('1', 500).ok
+  if matlabserver#eval_sync(s:ping, 500).ok
     return 1
   endif
   let l:start = reltime()
@@ -142,7 +145,7 @@ function! matlabserver#ensure(timeout_ms) abort
         return 0
       endif
     endif
-    if matlabserver#eval_sync('1', 500).ok
+    if matlabserver#eval_sync(s:ping, 500).ok
       redraw
       echo printf('matlabserver: ready after %.0f s',
         \ reltimefloat(reltime(l:start)))

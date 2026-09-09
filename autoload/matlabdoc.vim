@@ -267,11 +267,40 @@ function! matlabdoc#open(name) abort
 
   let l:key = l:dir . "\n" . l:name
   if has_key(s:cache, l:key)
-    call s:show(l:name, 'matlab -batch, earlier this session', s:cache[l:key])
+    call s:show(l:name, 'answered earlier this session', s:cache[l:key])
+    return
+  endif
+
+  " A warm matlabserver session answers in milliseconds; matlab -batch is
+  " the five second road taken only when there is none.
+  let l:lines = s:from_session(l:name, l:dir)
+  if !empty(l:lines)
+    if l:lines[0] !~# ' not found\.$'
+      let s:cache[l:key] = l:lines
+    endif
+    call s:show(l:name, 'the Matlab session, just now', l:lines)
     return
   endif
 
   call s:live(l:name)
+endfunction
+
+" Ask the running matlabserver session, or return [] when there is none or
+" it does not answer in time (then the caller starts matlab -batch).
+"
+" help() resolves a name against the session's current directory, and the
+" session's is wherever the last :MatlabRun left it, so the lookup steps
+" into the file's directory and back. The variable that carries the old
+" directory lives in the base workspace next to the user's; the name is
+" chosen to collide with nothing and cleared again.
+function! s:from_session(name, dir) abort
+  if !exists('*matlabserver#running') || !matlabserver#running()
+    return []
+  endif
+  let l:cmd = printf("matlabdoc_pwd__ = pwd; cd('%s'); help('%s'); cd(matlabdoc_pwd__); clear matlabdoc_pwd__",
+    \ substitute(a:dir, "'", "''", 'g'), a:name)
+  let l:res = matlabserver#eval_sync(l:cmd, get(g:, 'matlabdoc_session_timeout', 5000))
+  return l:res.ok ? l:res.lines : []
 endfunction
 
 function! s:built_when() abort

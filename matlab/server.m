@@ -159,7 +159,9 @@ while true
         txt = regexprep(txt, '\r\n?', '\n');
         % Strip anything hotlinks left behind, plus the backspaces Matlab
         % pads warning text with for terminal rendering.
-        txt = regexprep(txt, '</?a[^>]*>', '');
+        % help() called from a captured command also wraps the function
+        % name in <strong>, which -batch on the command line does not.
+        txt = regexprep(txt, '</?(a|strong|b)(\s[^>]*)?>', '');
         txt = strrep(txt, char(8), '');
         % CollapseDelimiters is on by default and would fold the blank lines
         % out of the output.
