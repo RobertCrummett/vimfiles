@@ -20,16 +20,68 @@ let s:req_what = ''            " what it is for, for progress messages
 " stay out of :messages, but an :echo from a callback does stop for a
 " hit-enter prompt as soon as it reaches the 'showcmd' and 'ruler' area,
 " so they are cut to fit.
+"
+" In Insert mode the command line belongs to 'showmode': the next redraw
+" puts "-- INSERT --" back over anything echoed there, so a message from a
+" callback was gone before it could be read, and a wait for the model
+" looked like nothing happening. There the same line goes into a one-line
+" popup over the bottom row instead, which nothing redraws away; it closes
+" by itself after a few seconds, or when the next line replaces it.
 function! s:say(msg) abort
   call add(s:log, a:msg)
   redraw
   echomsg a:msg
+  if s:in_insert()
+    call s:popup(a:msg, 'LlmProgress')
+  endif
 endfunction
 
 function! s:progress(msg) abort
+  if s:in_insert()
+    call s:popup(a:msg, 'LlmProgress')
+    return
+  endif
   redraw
   echo strpart(a:msg, 0, s:room())
 endfunction
+
+function! s:error(msg) abort
+  call add(s:log, a:msg)
+  echohl ErrorMsg
+  echomsg a:msg
+  echohl None
+  if s:in_insert()
+    call s:popup(a:msg, 'ErrorMsg')
+  endif
+endfunction
+
+" Take the progress line down: the thing it announced has arrived.
+function! s:progress_done() abort
+  if s:popup
+    silent! call popup_close(s:popup)
+    let s:popup = 0
+  endif
+endfunction
+
+function! s:in_insert() abort
+  return mode() =~# '^[iR]' && exists('*popup_create')
+endfunction
+
+let s:popup = 0
+function! s:popup(msg, hl) abort
+  call s:progress_done()
+  let s:popup = popup_create(strpart(a:msg, 0, &columns - 3), {
+    \ 'line': &lines, 'col': 1, 'pos': 'botleft', 'zindex': 250,
+    \ 'highlight': a:hl, 'padding': [0, 1, 0, 1], 'wrap': 0,
+    \ 'time': s:opt('popup_ms', 4000)})
+endfunction
+
+" The popup is about what is happening in Insert mode; once that is left,
+" it would sit over the command line and hide what is echoed there.
+augroup llm_popup
+  autocmd!
+  autocmd InsertLeave * call s:progress_done()
+augroup END
 
 " How much of the command line an :echo may use.
 function! s:room() abort
@@ -159,7 +211,7 @@ function! llm#set_model(name) abort
     return
   endif
   if empty(s:entry(a:name)) && !filereadable(a:name)
-    echohl ErrorMsg | echomsg 'llm: unknown model ' . a:name . ' (see :LlmModels)' | echohl None
+    call s:error('llm: unknown model ' . a:name . ' (see :LlmModels)')
     return
   endif
   let g:llm_model = a:name
@@ -175,28 +227,56 @@ endfunction
 function! llm#download(name) abort
   let l:e = s:entry(a:name)
   if empty(l:e)
-    echohl ErrorMsg | echomsg 'llm: unknown model ' . a:name . ' (see :LlmModels)' | echohl None
+    call s:error('llm: unknown model ' . a:name . ' (see :LlmModels)')
     return
   endif
   if !empty(llm#model_path(a:name))
     echo 'llm: ' . a:name . ' is already at ' . llm#model_path(a:name)
     return
   endif
+  if !executable('curl')
+    call s:error('llm: curl is needed to download weights')
+    return
+  endif
   let l:dir = s:root . '/models'
+  if !isdirectory(l:dir)
+    call mkdir(l:dir, 'p')
+  endif
   let l:dest = l:dir . '/' . l:e.file
   let l:url = 'https://huggingface.co/' . l:e.repo . '/resolve/main/' . l:e.file
   let l:cmd = ['curl', '-L', '-sS', '--fail', '-o', l:dest . '.part', l:url]
-  echo 'llm: downloading ' . l:e.file . ' (' . l:e.notes . ') ...'
-  call job_start(l:cmd, {'in_io': 'null',
-    \ 'exit_cb': {j, status -> s:download_done(l:e, l:dest, status)}})
+  let l:d = {'entry': l:e, 'dest': l:dest, 'start': reltime(), 'done': 0}
+  let l:d.job = job_start(l:cmd, {'in_io': 'null',
+    \ 'exit_cb': function('s:download_done', [l:d])})
+  if job_status(l:d.job) !=# 'run'
+    call s:error('llm: could not run curl')
+    return
+  endif
+  call s:say('llm: downloading ' . l:e.file . ' (' . l:e.notes . ') into models/ ...')
+  " Weights run to gigabytes and curl is told to be quiet, so report the
+  " size of the part file every couple of seconds; it is the only sign of
+  " life there is.
+  call timer_start(2000, function('s:download_progress', [l:d]))
 endfunction
 
-function! s:download_done(entry, dest, status) abort
-  if a:status == 0 && rename(a:dest . '.part', a:dest) == 0
-    echomsg 'llm: downloaded ' . a:entry.name . ' -> ' . a:dest
+function! s:download_progress(d, timer) abort
+  if a:d.done
+    return
+  endif
+  let l:size = getfsize(a:d.dest . '.part')
+  call s:progress(printf('llm: downloading %s: %.2f GB after %d s ...', a:d.entry.name,
+    \ max([0, l:size]) / 1073741824.0, float2nr(reltimefloat(reltime(a:d.start)))))
+  call timer_start(2000, function('s:download_progress', [a:d]))
+endfunction
+
+function! s:download_done(d, job, status) abort
+  let a:d.done = 1
+  if a:status == 0 && rename(a:d.dest . '.part', a:d.dest) == 0
+    call s:say(printf('llm: downloaded %s (%.2f GB in %d s) -> %s', a:d.entry.name,
+      \ getfsize(a:d.dest) / 1073741824.0, float2nr(reltimefloat(reltime(a:d.start))), a:d.dest))
   else
-    call delete(a:dest . '.part')
-    echohl ErrorMsg | echomsg 'llm: download of ' . a:entry.name . ' failed (curl exit ' . a:status . ')' | echohl None
+    call delete(a:d.dest . '.part')
+    call s:error('llm: download of ' . a:d.entry.name . ' failed (curl exit ' . a:status . ')')
   endif
 endfunction
 
@@ -228,11 +308,19 @@ function! s:psq(s) abort
   return "'" . substitute(a:s, "'", "''", 'g') . "'"
 endfunction
 
+" One element of Start-Process -ArgumentList. PowerShell joins the list
+" with spaces and adds no quoting of its own, so an argument with a space
+" in it (a model under "C:\Users\Some Name\...") has to carry its own
+" double quotes for the server to see it as one argument.
+function! s:psarg(s) abort
+  return s:psq(a:s =~# '\s' ? '"' . a:s . '"' : a:s)
+endfunction
+
 function! s:watchdog(cmd) abort
   let l:pid = getpid()
   if has('win32')
     let l:script = '$p = Start-Process -PassThru -NoNewWindow -FilePath ' . s:psq(a:cmd[0])
-      \ . ' -ArgumentList @(' . join(map(a:cmd[1:], 's:psq(v:val)'), ',') . ');'
+      \ . ' -ArgumentList @(' . join(map(a:cmd[1:], 's:psarg(v:val)'), ',') . ');'
       \ . ' while (-not $p.HasExited -and (Get-Process -Id ' . l:pid . ' -ErrorAction SilentlyContinue)) { Start-Sleep -Milliseconds 500 };'
       \ . ' if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force }'
     return ['powershell', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', l:script]
@@ -279,7 +367,83 @@ function! s:server_cmd(exe, model) abort
   if s:opt('kv_unified', 1)
     call add(l:cmd, '-kvu')
   endif
-  return l:cmd + s:opt('server_args', [])
+  return l:cmd + s:device_args(a:exe) + s:opt('server_args', [])
+endfunction
+
+" ------------------------------------------------------------- devices
+
+" The devices llama-server can offload to, as [id, name] pairs out of its
+" own --list-devices ("  Vulkan1: AMD Radeon RX 9070 XT (16304 MiB, ...)").
+" Asked once per session; the answer takes a Vulkan init, a fraction of a
+" second, which the start pays anyway.
+function! s:devices(exe) abort
+  if exists('s:devices_cache')
+    return s:devices_cache
+  endif
+  let l:lines = []
+  let l:job = job_start([a:exe, '--list-devices'], {'in_io': 'null', 'err_io': 'null',
+    \ 'out_cb': {ch, msg -> add(l:lines, msg)}})
+  let l:start = reltime()
+  while job_status(l:job) ==# 'run' && reltimefloat(reltime(l:start)) < 10
+    sleep 20m
+  endwhile
+  sleep 50m
+  let s:devices_cache = []
+  for l:l in l:lines
+    let l:m = matchlist(l:l, '^\s*\(\w\+\):\s\+\(.\{-}\)\s*\%((\d\+ MiB.*\)\?$')
+    if !empty(l:m)
+      call add(s:devices_cache, [l:m[1], l:m[2]])
+    endif
+  endfor
+  return s:devices_cache
+endfunction
+
+" A CPU with its own graphics next to a discrete card shows up as two
+" devices, and llama-server's default is then to split the model across
+" both ("-sm layer"), putting half the work on the slow one. So with more
+" than one device the model is pinned to one: the device g:llm_device
+" names, or by default the one that does not look integrated.
+function! s:device_args(exe) abort
+  let l:want = s:opt('device', '')
+  if l:want ==# 'all'
+    return []
+  endif
+  let l:devs = s:devices(a:exe)
+  if len(l:devs) < 2 && empty(l:want)
+    return []
+  endif
+  let l:pick = []
+  if !empty(l:want)
+    let l:pick = filter(copy(l:devs), 'v:val[0] ==# l:want || (v:val[0] . ": " . v:val[1]) =~? l:want')
+    if empty(l:pick)
+      call s:error('llm: no device matches g:llm_device "' . l:want . '"; the server chooses (see :LlmDevices)')
+      return []
+    endif
+  else
+    let l:pick = filter(copy(l:devs), 'v:val[1] !~? "Radeon(TM) Graphics\\|Intel\\|Iris\\|UHD\\|llvmpipe\\|\\<CPU\\>"')
+    if len(l:pick) != 1
+      return []
+    endif
+  endif
+  let s:device = l:pick[0]
+  return ['--device', l:pick[0][0]]
+endfunction
+
+let s:device = []
+function! llm#devices() abort
+  let l:exe = s:server_exe()
+  if empty(l:exe)
+    echo 'llm: llama-server not found'
+    return
+  endif
+  let l:devs = s:devices(l:exe)
+  if empty(l:devs)
+    echo 'llm: llama-server lists no devices (see :LlmLog after a start)'
+    return
+  endif
+  for [l:id, l:name] in l:devs
+    echo printf('%-10s %s%s', l:id, l:name, !empty(s:device) && s:device[0] ==# l:id ? '  <- used' : '')
+  endfor
 endfunction
 
 " ---------------------------------------------------------- http client
@@ -419,16 +583,17 @@ function! llm#start() abort
   if s:state ==# 'ready' || s:state ==# 'starting' || s:state ==# 'external'
     return 1
   endif
-  if empty(s:server_exe())
-    echohl ErrorMsg
-    echomsg 'llm: llama-server not found; install llama.cpp (winget install ggml.llamacpp) or set g:llm_server'
-    echohl None
+  let l:exe = s:server_exe()
+  if empty(l:exe)
+    call s:error('llm: llama-server not found; install llama.cpp (winget install ggml.llamacpp) or set g:llm_server')
+    return 0
+  endif
+  if !filereadable(l:exe)
+    call s:error('llm: ' . l:exe . ' does not exist (g:llm_server)')
     return 0
   endif
   if empty(llm#model_path(s:model_name()))
-    echohl ErrorMsg
-    echomsg 'llm: no weights for ' . s:model_name() . '; run :LlmDownload ' . s:model_name() . ' or :LlmModels'
-    echohl None
+    call s:error('llm: no weights for ' . s:model_name() . '; run :LlmDownload ' . s:model_name() . ' or :LlmModels')
     return 0
   endif
   let s:state = 'starting'
@@ -458,10 +623,10 @@ function! s:start_after_probe(health) abort
   endif
   let l:exe = s:server_exe()
   if empty(l:exe)
-    echohl ErrorMsg
-    echomsg 'llm: llama-server not found; install llama.cpp (winget install ggml.llamacpp) or set g:llm_server'
-    echohl None
-    return 0
+    let s:state = 'stopped'
+    let s:pending = []
+    call s:error('llm: llama-server not found; install llama.cpp (winget install ggml.llamacpp) or set g:llm_server')
+    return
   endif
   let l:model = llm#model_path(s:model_name())
   let l:cmd = s:server_cmd(l:exe, l:model)
@@ -475,12 +640,13 @@ function! s:start_after_probe(health) abort
   if job_status(s:job) !=# 'run'
     let s:state = 'stopped'
     let s:pending = []
-    echohl ErrorMsg | echomsg 'llm: could not start ' . l:exe | echohl None
+    call s:error('llm: could not start ' . l:exe)
     return
   endif
   let s:poll_started = localtime()
-  call s:say(printf('llm: started llama-server: %s, %.1f GB of weights, loading onto the GPU ...',
-    \ s:model_name(), getfsize(l:model) / 1073741824.0))
+  call s:say(printf('llm: started llama-server: %s, %.1f GB of weights, loading onto %s ...',
+    \ s:model_name(), getfsize(l:model) / 1073741824.0,
+    \ empty(s:device) ? 'the GPU' : s:device[1]))
   if !empty(s:pending)
     call s:say('llm: what you asked for runs as soon as it is ready')
   endif
@@ -510,7 +676,7 @@ function! s:poll_result(health) abort
     call s:say('llm: the server we were waiting for is gone; starting one')
     call s:start_after_probe('down')
   elseif l:elapsed > s:opt('start_timeout', 180)
-    echohl ErrorMsg | echomsg 'llm: server did not become ready; see :LlmLog' | echohl None
+    call s:error('llm: server did not become ready; see :LlmLog')
     call llm#stop()
   else
     let l:head = printf('llm: loading %s, %d s: ', s:model_name(), l:elapsed)
@@ -534,7 +700,7 @@ function! s:guarded(Fn, args) abort
     call call(a:Fn, a:args)
   catch
     call add(s:log, 'llm: error: ' . v:exception . ' at ' . v:throwpoint)
-    echohl ErrorMsg | echomsg 'llm: error: ' . v:exception . ' (see :LlmLog)' | echohl None
+    call s:error('llm: error: ' . v:exception . ' (see :LlmLog)')
   endtry
 endfunction
 
@@ -546,14 +712,17 @@ function! s:log_cb(channel, msg) abort
 endfunction
 
 function! s:exit_cb(job, status) abort
+  " A server stopped by :LlmStop or :LlmModel reports its exit after the
+  " next one may already be starting; that report is not about this state.
+  if s:job isnot v:null && a:job isnot s:job
+    return
+  endif
   if s:state !=# 'stopped'
     let s:state = 'stopped'
     let s:pending = []
     let s:job = v:null
     if a:status != 0
-      echohl WarningMsg
-      echomsg 'llm: server exited with status ' . a:status . ': ' . s:last_log_line(200) . ' (see :LlmLog)'
-      echohl None
+      call s:error('llm: server exited with status ' . a:status . ': ' . s:last_log_line(200) . ' (see :LlmLog)')
     endif
   endif
 endfunction
@@ -601,11 +770,21 @@ function! llm#reset_last() abort
 endfunction
 
 function! llm#log() abort
-  keepalt new
-  setlocal buftype=nofile bufhidden=wipe noswapfile nobuflisted
+  " Reuse the window a previous :LlmLog left open; naming a second buffer
+  " [LlmLog] while the first is still shown would fail with E95.
+  let l:win = bufwinnr('[LlmLog]')
+  if l:win > 0
+    execute l:win . 'wincmd w'
+    setlocal modifiable
+  else
+    keepalt new
+    setlocal buftype=nofile bufhidden=wipe noswapfile nobuflisted
+    execute 'silent keepalt file' fnameescape('[LlmLog]')
+  endif
+  silent %delete _
   call setline(1, empty(s:log) ? ['(no server output yet)'] : s:log)
-  setlocal nomodified
-  execute 'silent keepalt file' fnameescape('[LlmLog]')
+  setlocal nomodified nomodifiable
+  normal! G
 endfunction
 
 " ------------------------------------------------------------- requests
@@ -689,7 +868,7 @@ function! s:post_done(ctx, result) abort
       call s:when_ready(s:last_fn)
       return
     endif
-    echohl ErrorMsg | echomsg 'llm: ' . l:why . ' (:LlmStatus, :LlmLog)' | echohl None
+    call s:error('llm: ' . l:why . ' (:LlmStatus, :LlmLog)')
     return
   endif
   let l:text = a:result.body
@@ -698,17 +877,17 @@ function! s:post_done(ctx, result) abort
       \ ? s:sse_merge(s:sse_events(l:text)) : json_decode(l:text)
   catch
     call add(s:log, 'llm: bad response (HTTP ' . a:result.status . '): ' . strpart(l:text, 0, 400))
-    echohl ErrorMsg | echomsg 'llm: bad response: ' . strpart(l:text, 0, 120) . ' (see :LlmLog)' | echohl None
+    call s:error('llm: bad response: ' . strpart(l:text, 0, 120) . ' (see :LlmLog)')
     return
   endtry
   if type(l:resp) != v:t_dict
     call add(s:log, 'llm: unexpected response (HTTP ' . a:result.status . '): ' . strpart(l:text, 0, 400))
-    echohl ErrorMsg | echomsg 'llm: unexpected response: ' . strpart(l:text, 0, 160) . ' (see :LlmLog)' | echohl None
+    call s:error('llm: unexpected response: ' . strpart(l:text, 0, 160) . ' (see :LlmLog)')
     return
   endif
   if has_key(l:resp, 'error')
     let l:e = l:resp.error
-    echohl ErrorMsg | echomsg 'llm: server error: ' . (type(l:e) == v:t_dict ? get(l:e, 'message', string(l:e)) : string(l:e)) | echohl None
+    call s:error('llm: server error: ' . (type(l:e) == v:t_dict ? get(l:e, 'message', string(l:e)) : string(l:e)))
     return
   endif
   let l:t = get(l:resp, 'timings', {})
@@ -869,7 +1048,8 @@ endfunction
 
 function! s:warm_now() abort
   let l:ctx = s:context(s:opt('block_suffix_lines', 30))
-  call s:say(printf('llm: priming with %s: %s ...', fnamemodify(bufname('%'), ':t'), s:describe(l:ctx)))
+  let l:name = empty(bufname('%')) ? '[No Name]' : fnamemodify(bufname('%'), ':t')
+  call s:say(printf('llm: priming with %s: %s ...', l:name, s:describe(l:ctx)))
   call s:request(l:ctx, 1, function('s:warm_done'), 'priming')
 endfunction
 
@@ -893,7 +1073,7 @@ function! s:menu_now() abort
     return
   endif
   let l:ctx = s:context(s:opt('menu_suffix_lines', 8))
-  echo 'llm: thinking ...'
+  call s:progress('llm: thinking ...')
   " A few words' worth of tokens; the menu uses only the first line, and
   " every token costs generation time.
   call s:request(l:ctx, s:opt('menu_tokens', 12), function('s:menu_show', [l:ctx]), 'completing',
@@ -913,7 +1093,7 @@ function! s:menu_show(ctx, resp) abort
     let l:next = matchstr(l:rest, '^[^\n]*')
     if empty(trim(l:next)) || l:rest is# l:text
       let s:last.outcome = 'empty'
-      echo 'llm: no suggestion'
+      call s:progress('llm: no suggestion')
       return
     endif
     call s:block_show(a:ctx, {'content': "\n" . l:next})
@@ -932,6 +1112,7 @@ function! s:menu_show(ctx, resp) abort
   endfor
   " Clear "thinking ..." before Vim's own completion message, or the two
   " stack up into a hit-enter prompt.
+  call s:progress_done()
   redraw
   echo ''
   let s:last.outcome = 'menu'
@@ -951,7 +1132,7 @@ function! s:block_now() abort
     return
   endif
   let l:ctx = s:context(s:opt('block_suffix_lines', 30))
-  echo 'llm: thinking ...'
+  call s:progress('llm: thinking ...')
   " Streamed: the ghost text grows as the model writes, and CTRL-Y can
   " take what is there at any moment.
   call s:request(l:ctx, s:opt('block_tokens', 64), function('s:block_show', [l:ctx]), 'writing a block',
@@ -998,7 +1179,7 @@ function! s:block_show(ctx, resp) abort
   if empty(l:lines) || empty(trim(join(l:lines, "\n")))
     call llm#dismiss()
     let s:last.outcome = 'empty'
-    echo 'llm: no suggestion'
+    call s:progress('llm: no suggestion')
     return
   endif
   let s:last.outcome = 'block'
@@ -1067,11 +1248,13 @@ function! s:trim_block(lines, ctx) abort
 endfunction
 
 function! llm#dismiss() abort
-  " A block still streaming in is no longer wanted either.
+  " A block still streaming in is no longer wanted either, nor the line
+  " that reported on it or on the text being dropped.
   if s:req isnot v:null && !s:req.done && s:req_what ==# 'writing a block'
     call s:http_cancel(s:req)
     let s:req_started = 0
   endif
+  call s:progress_done()
   if empty(s:ghost)
     return
   endif
@@ -1112,3 +1295,6 @@ endfunction
 
 " Ghost text: the colour of text inserted by completion when Vim has it.
 execute 'highlight default link LlmGhost' hlexists('ComplMatchIns') ? 'ComplMatchIns' : 'Comment'
+" The progress popup shown in Insert mode: the colour of "-- INSERT --",
+" whose place on the screen it takes.
+highlight default link LlmProgress ModeMsg

@@ -27,6 +27,7 @@ command! -bar                       LlmStatus   call llm#status()
 command! -bar                       LlmLog      call llm#log()
 command! -bar -nargs=? -complete=customlist,llm#model_names LlmModel    call llm#set_model(<q-args>)
 command! -bar                       LlmModels   call llm#models()
+command! -bar                       LlmDevices  call llm#devices()
 command! -bar -nargs=1 -complete=customlist,llm#model_names LlmDownload call llm#download(<q-args>)
 
 inoremap <silent> <Plug>(llm_complete) <Cmd>call llm#complete_menu()<CR>

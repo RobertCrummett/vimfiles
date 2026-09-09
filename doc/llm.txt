@@ -90,8 +90,8 @@ request cost.
 ==============================================================================
 4. What it tells you                                           *llm-messages*
 
-Everything that happens in the background is reported on the command line
-so a wait is never silent:
+Everything that happens in the background is reported so a wait is never
+silent:
 
 - while the server starts: what was started, how big the weights are, and
   then once a second the elapsed time and the server's latest log line
@@ -102,6 +102,8 @@ so a wait is never silent:
 - while a request runs longer than a moment: what it is doing and for how
   long;
 - when a block arrives: how many lines, how long it took, and the keys;
+- while |:LlmDownload| runs: the size of the part file every two seconds,
+  and the total size and time when it lands;
 - when something goes wrong: the server exiting, a request the server
   could not answer, or an error inside the plugin, each with the reason;
   and when a request that waited for the server finds you have left
@@ -111,6 +113,22 @@ Milestones go through |:echomsg|, so |:messages| keeps them; the once-a-
 second progress lines replace each other and are not kept. |:LlmLog| has
 the server's own output and the milestones in full.
 
+Where the message appears ~                               *llm-messages-where*
+In Normal mode all of this goes on the command line. In Insert mode the
+command line belongs to 'showmode': the next redraw writes "-- INSERT --"
+over anything echoed there, and a message from a callback was gone before
+it could be read. So in Insert mode the same lines - `llm: thinking ...`,
+`llm: loading ..., 12 s`, `llm: 3 lines in 0.8 s; CTRL-Y accepts, CTRL-E
+dismisses`, and errors - go into a one-line popup on the bottom row of the
+screen instead. Nothing redraws that away. It closes after
+|g:llm_popup_ms|, when the next line replaces it, when what it announced
+arrives, when the ghost text it was about is accepted or dismissed, and on
+leaving Insert mode, where it would otherwise sit over the command line.
+Milestones still reach |:messages| either way.
+
+The popup uses the highlight group `LlmProgress`, which links to `ModeMsg`
+by default, and `ErrorMsg` for errors.
+
 Ghost text uses the highlight group `LlmGhost`, which links to
 `ComplMatchIns`, the group Vim uses for text that completion inserted, so
 the two look the same. The custom colorscheme makes both light blue.
@@ -118,10 +136,22 @@ the two look the same. The custom colorscheme makes both light blue.
 ==============================================================================
 5. The server                                                    *llm-server*
 
-The plugin drives llama.cpp's `llama-server`, found on $PATH, in the
-winget package directory, or at |g:llm_server|. It is started with the
-current model, all layers on the GPU, an 8k context, flash attention and
-prompt-cache reuse, bound to 127.0.0.1:|g:llm_port|, no web UI.
+The plugin drives llama.cpp's `llama-server`, taken from |g:llm_server| if
+that is set, else from $PATH, else from the winget package directory. It is
+started with the current model, all layers on the GPU, an 8k context, flash
+attention and prompt-cache reuse, bound to 127.0.0.1:|g:llm_port|, no web
+UI.
+
+Which GPU ~                                                    *llm-device*
+A CPU with its own graphics next to a discrete card shows up to the server
+as two devices (`:LlmDevices` lists them), and its default is then to split
+the model across both. So when there is more than one, the model is pinned
+to a single device with `--device`: the one |g:llm_device| names, or by
+default the one that does not look integrated (names with "Radeon(TM)
+Graphics", "Intel", "Iris", "UHD", "llvmpipe" or "CPU" are passed over).
+When that leaves no clear choice the server decides. The start message
+names the device used; on this machine that is the RX 9070 XT, not the
+9950X3D's own Radeon.
 
 Lifecycle:
 - Never started at Vim startup.
@@ -157,7 +187,7 @@ same setup works on both of your machines. `curl` is needed only for
 models/registry.txt lists the models the plugin knows: a short name, the
 Hugging Face repository, the file name, whether it supports
 fill-in-the-middle, and a note on size. The weights themselves are not
-tracked. The plugin looks for a registry file in models/, then in
+tracked. The plugin looks for a model's file in models/, then in
 llama.cpp's own download cache, then in |g:llm_model_dirs|.
 
 The current model is |g:llm_model|; the default is qwen2.5-coder-3b.
@@ -185,15 +215,29 @@ The current model is |g:llm_model|; the default is qwen2.5-coder-3b.
                         rate, and the total time.
                                                                     *:LlmLog*
 :LlmLog                 The server's output in a scratch window; look here
-                        when it fails to start.
+                        when it fails to start. Run again while the window
+                        is open, and it reuses that window.
                                                                   *:LlmModel*
 :LlmModel [name]        Show or set the model. Changing it stops a running
                         server; the next completion starts the new one.
                                                                  *:LlmModels*
 :LlmModels              The registry with a present/missing column.
+                                                                *:LlmDevices*
+:LlmDevices             The devices llama-server can offload to, with the
+                        one the model is pinned to marked; see |llm-device|.
                                                                *:LlmDownload*
 :LlmDownload {name}     Fetch the weights for a registry entry into
-                        models/ in the background.
+                        models/ in the background, with `curl`, which has to
+                        be installed; models/ is created if it is not there.
+                        The file is written as {file}.part and renamed when
+                        it is whole, so an interrupted download is never
+                        taken for weights. Every two seconds it reports how
+                        much has arrived, >
+                          llm: downloading qwen2.5-coder-7b-q4: 1.85 GB
+                          after 24 s ...
+<                       and when it finishes, the size, the time and where
+                        it went. A model already present is not fetched
+                        again.
 
 ==============================================================================
 8. Options                                                      *llm-options*
@@ -202,7 +246,10 @@ The current model is |g:llm_model|; the default is qwen2.5-coder-3b.
 g:llm_model             Registry name or a path to a .gguf. Default
                         `qwen2.5-coder-3b`.
                                                                *g:llm_server*
-g:llm_server            Path to llama-server when it is not on $PATH.
+g:llm_server            Path to llama-server when it is not on $PATH. A
+                        path that is not there is reported as
+                        `llm: {path} does not exist (g:llm_server)` rather
+                        than tried.
                                                                  *g:llm_port*
 g:llm_port              Default 8797.
                                                                   *g:llm_ctx*
@@ -225,6 +272,13 @@ g:llm_kv_unified        Pass -kvu to llama-server; default 1. Without it a
                         0 for a llama-server too old to know the flag.
                                                            *g:llm_gpu_layers*
 g:llm_gpu_layers        Layers to keep on the GPU. Default 99 (all).
+                                                               *g:llm_device*
+g:llm_device            Which device to load the model onto when the
+                        server sees more than one (|llm-device|): a device
+                        id such as `Vulkan1`, or a pattern matched
+                        case-insensitively against "id: name", such as
+                        `9070`. `all` leaves the choice to the server.
+                        Default empty: the device that is not integrated.
                                                           *g:llm_server_args*
 g:llm_server_args       Extra llama-server arguments, as a list.
                                                            *g:llm_model_dirs*
@@ -276,6 +330,14 @@ g:llm_predict_ms        Time limit on generation, default 4000: a long
                         suggestion is cut short rather than late.
                                                               *g:llm_timeout*
 g:llm_timeout           Seconds before a request is given up, default 90.
+                                                        *g:llm_start_timeout*
+g:llm_start_timeout     Seconds to wait for the server to answer /health
+                        after it was started, default 180. Weights load off
+                        disk the first time, which is the slow case.
+                                                             *g:llm_popup_ms*
+g:llm_popup_ms          How long an Insert-mode message popup stays up, in
+                        milliseconds, when nothing else takes it down.
+                        Default 4000. See |llm-messages-where|.
 
 A single menu suggestion is inserted straight away rather than shown,
 because 'completeopt' lacks `menuone`; add it to always see the menu.
