@@ -23,7 +23,11 @@ set wildignore+=*/.git/*,*/.DS_Store
 
 set backspace=eol,start,indent
 
-if has('termguicolors')
+" Not every place this vimrc runs can do 24-bit colour: a "vim -es" batch
+" run, or a terminal without the t_8f/t_8b codes, raises E954 on the bare
+" :set. The GUI and a Windows console with VT support (vcon) always can;
+" elsewhere the codes have to be there.
+if has('termguicolors') && (has('gui_running') || has('vcon') || !empty(&t_8f))
   set termguicolors
 endif
 
