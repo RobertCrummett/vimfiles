@@ -143,6 +143,11 @@ function! s:Accents() abort
   " next to function, for and if.
   hi! link matlabOO               customLavendar
   hi! link matlabString           customLightPurple
+  " global and persistent, the runtime's matlabScope, default to Type, which
+  " quiet leaves plain. They are the two keywords that reach outside the
+  " function's own workspace, rare and worth noticing, so they take the
+  " colour of labels and jumps rather than that of the other keywords.
+  hi! link matlabScope            customPink
 
   " Lisp
   hi! link lispFunc customLavendar
