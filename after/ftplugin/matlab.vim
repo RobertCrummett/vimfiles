@@ -16,6 +16,25 @@ setlocal softtabstop=-1
 " which would overwrite a buffer-local set here.
 let g:MATLAB_function_indent = 0
 
+" matchit: the runtime file pairs function with endfunction, which is
+" Octave's spelling, and lets only if, switch, for, while and try close on
+" end. In Matlab a function closes on end like everything else, as do
+" classdef and its blocks, parfor and spmd. So the words are redefined
+" here with every block opener in one group, so that % on function lands
+" on its end and skips the nested blocks in between. An end is only the
+" one that starts a statement: x(end) and x{end-1} are indexing, and the
+" runtime's lookbehind is kept for that, extended to a comma so that the
+" end of "for i = 1:3, y = i, end" counts. The comma is written \%d44:
+" matchit splits the words on literal commas and colons. break, continue
+" and return are statements rather than structure and are left out of the
+" cycle.
+if exists('loaded_matchit')
+  let b:match_words =
+    \ '\<\%(if\|switch\|for\|parfor\|while\|try\|function\|classdef\|methods\|properties\|events\|enumeration\|arguments\|spmd\)\>'
+    \ . ':\<\%(elseif\|else\|case\|otherwise\|catch\)\>'
+    \ . ':\%(\%(^\|;\|\%d44\)\s*\)\@<=end\>'
+endif
+
 " K opens Matlab's own help for the word under the cursor, out of the index
 " plugin/matlabdoc.vim builds. Without an index the first lookup starts Matlab
 " and takes a few seconds; :MatlabDocIndex removes that for good.
