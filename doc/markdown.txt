@@ -1,0 +1,45 @@
+*markdown.txt*   Math and tables in markdown files           *markdown-plugin*
+
+                                          *markdown-local* *plugin-markdown*
+Two small additions to the runtime's markdown support, in
+after/syntax/markdown.vim, after/ftplugin/markdown.vim and
+autoload/markdown.vim.
+
+==============================================================================
+1. Math                                                        *markdown-math*
+
+`$...$` on one line and `$$...$$` over any number of lines are math. Inside
+them nothing else is matched, so the underscore in `$F_a$` is no longer taken
+for an italic marker and marked as an error, and the text is not spell
+checked. The regions are coloured like Typst's math by colors/custom.vim.
+
+The usual rule keeps prices out of it: the opening `$` must not be followed
+by a space and the closing `$` must not be preceded by one nor followed by a
+digit, so "costs $5 and $6" is prose. `\$` is a literal dollar.
+
+==============================================================================
+2. Tables                                                    *markdown-tables*
+
+|gq| over a table lines it up. A table is a run of lines containing a pipe
+that includes a separator row (`|---|:--:|`). Every cell is trimmed and
+padded to the widest cell in its column, the separator row is redrawn to the
+same widths keeping its alignment colons (`---` left, `--:` right, `:-:`
+centred, `:--` left as written), every row gets a leading and trailing pipe,
+and rows with fewer cells than the widest get empty ones. Widths are display
+widths, so CJK text lines up too. `\|` inside a cell is kept as it is.
+Nothing in a table is ever wrapped. >
+
+    | Name | Value | Note |          | Name  | Value |  Note   |
+    |---|--:|:-:|               ->    | ----- | ----: | :-----: |
+    |alpha|1|first|                   | alpha |     1 |  first  |
+<
+`gqq` on any row formats the whole table, since the column widths belong to
+the whole table. Lines that are not part of a table are formatted by Vim's
+own gq as before, so `gqip` over prose and `gqG` over a whole file both do
+the right thing to each part. A line with a pipe in it but no separator row
+nearby is prose.
+
+The ftplugin also takes `t` and `c` out of 'formatoptions', which the runtime
+puts back: nothing here wraps while you type.
+
+ vim:tw=78:ts=8:ft=help:norl:

@@ -29,6 +29,11 @@ Because I always come back to this editor, I might as well study the language of
   `:SynHighlights [pattern]`, `:SynRules [group]` explain why text is coloured
   the way it is, in searchable buffers, with the file and line each rule or
   link came from and whether it is yours to edit.
+- **after/ftplugin/markdown.vim**, **after/syntax/markdown.vim**,
+  **autoload/markdown.vim** — `$...$` and `$$...$$` are math, so the `_` in
+  `$F_a$` is no longer an error and is coloured like Typst math; `gq` over a
+  table pads every column to its widest cell and redraws the separator row
+  to match, leaving prose to Vim's own formatting. See `:help markdown-local`.
 
 ## Thesaurus
 
@@ -71,7 +76,7 @@ the quickfix list. See `:help matlabdoc` and `:help matlabserver`.
 
 Every local plugin has a Vim help file under `doc/`: `:help comments`,
 `:help diredit`, `:help geospell`, `:help llm`, `:help matlabdoc`,
-`:help matlabserver`, `:help synexplore`, `:help tagsgen`,
+`:help matlabserver`, `:help markdown-local`, `:help synexplore`, `:help tagsgen`,
 `:help thesaurus.vim`, `:help sexptutor`, and any command by name, for
 example `:help :SynCursor` or `:help :MakeTags`. The vimrc rebuilds
 `doc/tags` at startup, so edits to the help files show up on the next

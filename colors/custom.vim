@@ -129,6 +129,10 @@ function! s:Accents() abort
   hi! link markdownIdDeclaration customPink
   hi! link markdownUrl           customLightPurple
   hi! link markdownEscape        customLightPurple
+  " $...$ and $$...$$, defined in after/syntax/markdown.vim, like Typst math.
+  hi! link markdownMath          customLightPurple
+  hi! link markdownMathBlock     customLightPurple
+  hi! link markdownMathDelim     customLightPurple
 
   " Matlab
   hi! link matlabConditional      customLavendar
