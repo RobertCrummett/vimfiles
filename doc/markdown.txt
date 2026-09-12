@@ -11,7 +11,10 @@ autoload/markdown.vim.
 `$...$` on one line and `$$...$$` over any number of lines are math. Inside
 them nothing else is matched, so the underscore in `$F_a$` is no longer taken
 for an italic marker and marked as an error, and the text is not spell
-checked. The regions are coloured like Typst's math by colors/custom.vim.
+checked. colors/custom.vim gives the regions, and `code spans` with them,
+the light purple of Typst's math; the runtime had left code spans plain.
+They are ordinary syntax regions, markdownMath and markdownMathBlock, and
+|:SynCursor| shows them.
 
 The usual rule keeps prices out of it: the opening `$` must not be followed
 by a space and the closing `$` must not be preceded by one nor followed by a

@@ -129,7 +129,12 @@ function! s:Accents() abort
   hi! link markdownIdDeclaration customPink
   hi! link markdownUrl           customLightPurple
   hi! link markdownEscape        customLightPurple
-  " $...$ and $$...$$, defined in after/syntax/markdown.vim, like Typst math.
+  " Code spans and math, one colour: `x` and $x$ are both "this is not
+  " prose, read it literally". The runtime leaves markdownCode with no link
+  " at all, so the spans were plain; the math regions come from
+  " after/syntax/markdown.vim. The same light purple as Typst math.
+  hi! link markdownCode          customLightPurple
+  hi! link markdownCodeDelimiter customLightPurple
   hi! link markdownMath          customLightPurple
   hi! link markdownMathBlock     customLightPurple
   hi! link markdownMathDelim     customLightPurple
