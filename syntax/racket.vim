@@ -8,6 +8,13 @@
 function! s:ToggleSICPSyntax()
   " Applies syntax highlighting specific to MIT Scheme used in SICP.
   let l:is_sicp = (getline(1) =~# '^#lang sicp$')
+  " Defining or clearing syntax items throws away Vim's parse of the buffer,
+  " and this runs on every BufEnter and write, so leave them alone unless the
+  " #lang line has changed.
+  if l:is_sicp == get(b:, 'racket_sicp_syntax', 0)
+    return
+  endif
+  let b:racket_sicp_syntax = l:is_sicp
   if l:is_sicp
     " Added to @racketTop, the cluster the racketStruc paren regions contain,
     " rather than with containedin=ALLBUT: that reached inside strings and
@@ -21,6 +28,10 @@ function! s:ToggleSICPSyntax()
     silent! syntax clear SICPBuiltin
   endif
 endfunction
+
+" Sourcing this file means the buffer's syntax items were just cleared, so
+" forget what the toggle last applied.
+unlet! b:racket_sicp_syntax
 
 " This file is sourced once per racket buffer, so the clear has to name the
 " buffer: a bare "au!" would empty the whole group and leave every racket

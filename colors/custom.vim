@@ -17,10 +17,12 @@ function! s:Accents() abort
   "   customLightPurple  special characters, math, options, key notation
   "   customPink         labels, references, links, jumps
   "   customLightBlue    text that completion put or offers to put in the buffer
-    hi customLavendar    guifg=#aa9fff guibg=NONE gui=NONE ctermfg=147 ctermbg=NONE cterm=NONE
-    hi customLightPurple guifg=#ff9fff guibg=NONE gui=NONE ctermfg=219 ctermbg=NONE cterm=NONE
-    hi customPink        guifg=#ff00af guibg=NONE gui=NONE ctermfg=199 ctermbg=NONE cterm=NONE
-    hi customLightBlue   guifg=#5fafff guibg=NONE gui=NONE ctermfg=75  ctermbg=NONE cterm=NONE
+  "   customLightPink    string and character literals
+  hi customLavendar    guifg=#aa9fff guibg=NONE gui=NONE ctermfg=147 ctermbg=NONE cterm=NONE
+  hi customLightPurple guifg=#ff9fff guibg=NONE gui=NONE ctermfg=219 ctermbg=NONE cterm=NONE
+  hi customPink        guifg=#ff00af guibg=NONE gui=NONE ctermfg=199 ctermbg=NONE cterm=NONE
+  hi customLightPink   guifg=#ffafd7 guibg=NONE gui=NONE ctermfg=218 ctermbg=NONE cterm=NONE
+  hi customLightBlue   guifg=#5fafff guibg=NONE gui=NONE ctermfg=75  ctermbg=NONE cterm=NONE
 
   " TODO markers stay as quiet as the comments they live in.
   hi! link Todo Comment
@@ -162,6 +164,32 @@ function! s:Accents() abort
   " Lisp
   hi! link lispFunc customLavendar
   hi! link lispKey  customLightPurple
+
+  " Racket (groups beyond upstream's come from after/syntax/racket.vim, which
+  " links calls, defined names, named lets and struct names to racketFunc).
+  " Functions are lavender wherever they appear. Text literals are light pink:
+  " strings, here strings, #\a characters and #rx"" #px"" regexps. Quoted data
+  " is hot pink, the quote included: 'return-early and every symbol in
+  " '(a b c), #(a b) or #hash((k . v)); #:keyword arguments label the value
+  " after them, so they match. The rest of the # notation, #t #f, the #, #hash
+  " and #s of literals, #' #` #, and #lang, is light purple like escapes; a #;
+  " datum is a comment. Numbers stay plain, #x1F included, and syntax forms
+  " such as define stay plain.
+  hi! link racketFunc          customLavendar
+  hi! link racketExtFunc       customLavendar
+  hi! link racketSyntax        customLavendar
+  hi! link racketString        customLightPink
+  hi! link racketHereString    customLightPink
+  hi! link racketChar          customLightPink
+  hi! link racketRe            customLightPink
+  hi! link racketStringEscape  customLightPurple
+  hi! link racketUStringEscape customLightPurple
+  hi! link racketQuotedSymbol  customPink
+  hi! link racketExtSyntax     customPink
+  hi! link racketBoolean       customLightPurple
+  hi! link racketLit           customLightPurple
+  hi! link racketLang          customLightPurple
+  hi! link racketNote          racketComment
 
   " Directory listings (plugin/diredit.vim)
   hi! link direditDir     Directory
