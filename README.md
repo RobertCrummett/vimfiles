@@ -66,17 +66,32 @@ Matlab needs about five seconds to start, so neither help nor `:make` pays
 for it. `plugin/matlabdoc.vim` answers `K` from an index of every documented
 function's help text, built once by `matlab/build_index.m`; `:MatlabDoc`,
 `:MatlabDocIndex` and `:MatlabDocStatus` drive it. `plugin/matlabserver.vim`
-keeps one Matlab session warm behind a loopback socket (`matlab/server.m`),
-so `:Matlab {command}`, `:MatlabRun` and `:MatlabMake` answer in
-milliseconds; the session closes itself after thirty idle minutes. Typing
-`:make` in a matlab buffer runs `:MatlabMake`, and errors land in
-the quickfix list. See `:help matlabdoc` and `:help matlabserver`.
+keeps one Matlab session warm behind a loopback socket (`matlab/server.m`,
+`matlab/vimserver.m`), so `:Matlab {command}`, `:MatlabRun` and
+`:MatlabMake` answer in milliseconds; the session closes itself after thirty
+idle minutes. Typing `:make` in a matlab buffer runs `:MatlabMake`, and
+errors land in the quickfix list. See `:help matlabdoc` and
+`:help matlabserver`.
+
+`plugin/matlabdebug.vim` debugs in that session: `:MatlabDebug` opens a
+stack window and a variables window, `:Break` sets a breakpoint, `:Run`
+runs the file, and `:Step`, `:Over`, `:Finish`, `:Continue`, `:Up`,
+`:Down`, `:Evaluate` and `:Watch` do what they do in Vim's own termdebug.
+The stopped line is marked in the source. A `:make` that hits a breakpoint
+opens the debugger by itself. **This rests on an undocumented Matlab
+interface** (`MLExecuteServices.consoleEval`, which queues a line to the
+session's prompt from a timer callback while it sits at `K>>`); it works on
+R2026a and is a workaround, not something to support for the long term.
+`:help matlabdebug-workaround` records what was tried, what was found, and
+what to do when a release breaks it. The session runs without any window,
+so nothing takes the focus from Vim.
 
 ## Help
 
 Every local plugin has a Vim help file under `doc/`: `:help comments`,
 `:help diredit`, `:help geospell`, `:help llm`, `:help matlabdoc`,
-`:help matlabserver`, `:help markdown-local`, `:help synexplore`, `:help tagsgen`,
+`:help matlabserver`, `:help matlabdebug`, `:help markdown-local`,
+`:help synexplore`, `:help tagsgen`,
 `:help thesaurus.vim`, `:help sexptutor`, and any command by name, for
 example `:help :SynCursor` or `:help :MakeTags`. The vimrc rebuilds
 `doc/tags` at startup, so edits to the help files show up on the next

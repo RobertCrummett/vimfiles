@@ -44,3 +44,8 @@
 /matlab/index/
 /matlab/*.log
 /matlab/__pycache__/
+
+# The session's own Matlab preferences folder (MATLAB_PREFDIR), so that the
+# setting that stops it opening an editor at every breakpoint never reaches a
+# desktop Matlab. Created by :MatlabStart.
+/matlab/prefs/

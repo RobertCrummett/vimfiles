@@ -1,0 +1,363 @@
+*matlabdebug.txt*   Debug Matlab code in Vim                *matlabdebug-plugin*
+
+                                            *matlabdebug* *plugin-matlabdebug*
+A debugger for Matlab inside Vim, on top of the warm session |matlabserver|
+keeps. The line Matlab is stopped on is marked in the source, the stack and
+the variables of the selected frame have windows of their own, and stepping
+is a command away. Lives in plugin/matlabdebug.vim, autoload/matlabdebug.vim
+and, on the Matlab side, matlab/vimserver.m.
+
+1. A session                                    |matlabdebug-session|
+2. Commands                                     |matlabdebug-commands|
+3. The windows                                  |matlabdebug-windows|
+4. Breakpoints                                  |matlabdebug-breakpoints|
+5. Output                                       |matlabdebug-output|
+6. How it works, and the workaround it rests on |matlabdebug-workaround|
+7. Limits                                       |matlabdebug-limits|
+8. Settings                                     |matlabdebug-settings|
+
+==============================================================================
+1. A session                                            *matlabdebug-session*
+
+In a matlab buffer: >
+
+    :MatlabDebug           the stack and variables windows open on the right
+    :Break                 a breakpoint on the cursor line, marked ●
+    :Run                   runs this file in the session
+<
+Matlab stops at the breakpoint. The line is highlighted and gets the cursor,
+the stack window lists the frames, the variables window lists the frame's
+variables. Then: >
+
+    :Over                  next line
+    :Step                  into the call on this line
+    :Finish                out of this function
+    :Continue              to the next breakpoint, or the end
+    :Evaluate a            a, in the frame Matlab is stopped in
+    :Watch norm(r)         shown in the variables window at every stop
+    :Watch                 toggle watching the variable under the cursor
+    :Up  :Down  :Frame 2   look at another frame: cursor and variables follow
+    :Stop                  abandon the run
+    :MatlabDebugClose      close the windows; breakpoints are cleared
+<
+The commands are those of Vim's own |terminal-debug|, so the habits carry
+over. A run that raises leaves its errors in the quickfix list the way
+|:MatlabMake| does; a run that finishes shows what it printed.
+
+You need not open the debugger to use it: |:make| or |:Matlab| on code with
+a breakpoint in it stops there, and the windows open by themselves. Once
+|:MatlabDebugClose| has cleared the breakpoints, |:make| runs the file
+through as it always did.
+
+==============================================================================
+2. Commands                                            *matlabdebug-commands*
+
+                                                              *:MatlabDebug*
+:MatlabDebug            Open the debugger: the two windows, and the commands
+                        below. Starts the session if there is none. Nothing
+                        runs until you say so.
+
+                                                         *:MatlabDebugClose*
+:MatlabDebugClose       Close the windows and remove the commands. A run
+                        that is stopped is abandoned, and every breakpoint
+                        is cleared, signs and session alike, so that the
+                        next |:make| runs the file through. `q` in either
+                        window does the same.
+
+The rest exist while the debugger is open.
+
+                                                          *matlabdebug-:Run*
+:Run [{file}]           Run {file}, or the current buffer if it is a matlab
+                        one, or what ran last. The buffer is written first.
+                        Every breakpoint is sent again before the run, so a
+                        session started since they were set has them too.
+                        Matlab is moved to the file's directory, as
+                        |:MatlabRun| does. While the debugger is open,
+                        |:make|, |:MatlabMake| and |:MatlabRun| all do this
+                        instead of their usual run.
+
+                                                        *matlabdebug-:Break*
+:Break [{line}] [if {condition}]
+                        Toggle a breakpoint on the cursor line, or on
+                        {line}, of the current buffer. With a condition, a
+                        Matlab expression evaluated in the function's
+                        workspace, execution stops only when it is true: >
+                            :Break if k > 100
+<                       See |matlabdebug-breakpoints| for where it lands.
+
+                                                        *matlabdebug-:Clear*
+:Clear [{line}]         Remove the breakpoint on the cursor line, or {line}.
+
+                                                         *matlabdebug-:Step*
+:Step                   `dbstep in`: into the function called on this line,
+                        or to the next line if it calls none.
+                                                         *matlabdebug-:Over*
+:Over                   `dbstep`: to the next line of this function.
+                                                       *matlabdebug-:Finish*
+:Finish                 `dbstep out`: run the rest of this function and stop
+                        in its caller.
+                                                     *matlabdebug-:Continue*
+:Continue               `dbcont`: run to the next breakpoint, or the end.
+                                                         *matlabdebug-:Stop*
+:Stop                   `dbquit`: abandon the run. The session is unharmed
+                        and its base workspace is as the run left it.
+
+                                                           *matlabdebug-:Up*
+:Up                     `dbup`: select the calling frame. The cursor moves
+:Down                   to its line and the variables window shows its
+                        workspace; |:Evaluate| and |:Watch| use it too.
+                        `dbdown` goes back. Stepping always steps the
+                        innermost frame, whichever is selected.
+                                                        *matlabdebug-:Frame*
+:Frame {n}              Select frame {n} as numbered in the stack window, 1
+                        the innermost.
+
+                                                     *matlabdebug-:Evaluate*
+:Evaluate [{expr}]      Evaluate {expr} in the selected frame, or in the
+:'<,'>Evaluate          base workspace when not stopped. Without an
+                        argument, the word under the cursor; with a range,
+                        the Visual selection. Short results are echoed,
+                        longer ones open the output window
+                        |matlabserver-output|. It is a plain evaluation:
+                        `x = 3` assigns in the frame.
+
+                                                        *matlabdebug-:Watch*
+:Watch {expr}           Show {expr} at the top of the variables window,
+                        re-evaluated at every stop and frame change. The
+                        value is `disp({expr})` on one line, so a matrix
+                        shows as its rows joined. An expression that raises
+                        shows the error.
+:Watch                  Bare: watch the word under the cursor, or stop
+                        watching it if it already is. In the variables
+                        window, the variable or watch on the cursor line;
+                        `w` there does the same. A watched variable is
+                        marked with * in the variables list.
+                                                      *matlabdebug-:Unwatch*
+:Unwatch {expr}         Stop watching {expr}, given as the expression or its
+:Unwatch {n}            number in the list. `dd` on a watch line in the
+                        variables window does the same.
+
+==============================================================================
+3. The windows                                          *matlabdebug-windows*
+
+|:MatlabDebug| splits a column off the right, |g:matlabdebug_width| wide:
+the variables window above, the stack window below. Both are scratch
+buffers, unlisted, and read-only.
+
+The stack window has one line per frame, innermost first, `>` on the
+selected one: >
+
+    >1  g1  f1.m:10
+     2  f1  f1.m:5
+     3  t   t.m:1
+<
+<CR> on a line selects that frame, as |:Frame| does. Frames belonging to
+the session's own plumbing are not shown.
+
+The variables window has the watches, then the variables of the selected
+frame: name, size, class and the short value the desktop's workspace
+browser would show: >
+
+    Watch
+      a * 10 = 30
+
+    Variables  f1 (line 3)
+    * a     1x1     double   3
+      x     1x1     double   2
+<
+<CR> on a variable evaluates it in full, as |:Evaluate| does; <CR> on a
+watch does the same for the expression. `w` on a variable watches it, or
+stops watching it, and the * in the first column marks the ones that are
+watched; `dd` on a watch removes it.
+
+The source is shown in the window it was in when the debugger opened, or
+the first window that is not one of the debugger's. A file Matlab stops in
+that is not loaded is opened there; a modified buffer in that window is
+hidden, not written.
+
+A file of Matlab's own, under matlabroot, is read-only for good when the
+debugger opens it: stepping into `strsplit` shows strsplit.m, and nothing
+there is yours to change. Your own files are left as they are, stopped in
+or not. Mind that the code running is the code on disk as it was when the
+run started: an edit takes effect the next time the file is called or
+|:Run| is given, and the signs move with it (|matlabdebug-breakpoints|).
+
+==============================================================================
+4. Breakpoints                                      *matlabdebug-breakpoints*
+
+A breakpoint is a real `dbstop` in the session. Matlab decides where it
+goes: on a comment, a blank line or a `function` line it moves to the next
+line that runs, and the sign goes where Matlab put it. The reply to every
+|:Break| and |:Clear| is Matlab's own list for the file, so the signs never
+disagree with the session.
+
+Breakpoints are kept in a table here as well as in the session, keyed by
+file, so that a file opened later gets its signs, and so that |:Run| can
+send them all again: a session that was restarted, by |:MatlabStop| or the
+idle timeout, has none until then. `clear all` in your code does not
+remove them.
+
+Signs move with the text, so a breakpoint follows an edit: insert two
+lines above it and the sign, the table and the session all say the new
+line the next time you |:Run|. The table is rebuilt from the signs of every
+loaded file before they are sent. A condition stays with its sign.
+
+Breakpoints are per file, whatever buffer they were set from. |:Clear|
+removes them one at a time; |:MatlabDebugClose| removes them all, and so
+does the session ending.
+
+Only line breakpoints are offered. `dbstop if error` and the rest can be
+set with |:Matlab|, and nothing here clears them. A stop from one of
+those, or from a `keyboard` in your code, is shown like any other: Matlab
+is stopped whether or not the debugger is open, so the windows open to
+show where.
+
+==============================================================================
+5. Output                                                *matlabdebug-output*
+
+What the running code prints is collected and shown when the run ends,
+in the output window, the way |:MatlabRun| shows it; it is not streamed
+while the code is stopped. Errors go to the quickfix list as with
+|:MatlabMake|, with the cursor left where it is. A run abandoned with
+|:Stop| reports only that.
+
+==============================================================================
+6. How it works, and the workaround it rests on      *matlabdebug-workaround*
+
+THIS RESTS ON AN UNDOCUMENTED INTERFACE AND IS NOT TO BE SUPPORTED FOR THE
+LONG TERM. Read this section before depending on the debugger for anything
+that matters, and before upgrading Matlab.
+
+The problem. The session evaluates what Vim sends it. When that code
+reaches a breakpoint, Matlab stops at a K>> prompt, and the code that was
+reading the socket is suspended underneath it. Without the desktop there is
+nothing to type at that prompt: the process reads no stdin, so the
+Emacs-style comint approach is closed on Windows, and Matlab's own engine
+APIs do not support debugging at all.
+
+What was found, by experiment against R2026a in September 2026:
+
+- Timer callbacks still fire while Matlab sits at a K>> prompt, and at an
+  idle >> prompt, though not while the main thread is inside a blocking
+  Java call. So the session's listening was moved from a blocking accept
+  loop to a timer, matlab/vimserver.m, which keeps reading the socket
+  while the code is stopped.
+
+- From a timer callback, `dbstep` and the rest are refused: "Debug
+  commands only allowed when stopped in debug mode". They have to be run
+  by the prompt itself. The Java call
+  `com.mathworks.mlservices.MLExecuteServices.consoleEval(cmd)` queues a
+  line to the prompt as though it had been typed, and the prompt drains
+  that queue whether it is >> or K>>. This is the workaround. It is what
+  Matlab's own desktop buttons use, and the FileExchange tool
+  breakpoint_command uses it the same way, but it is undocumented, and
+  MathWorks has said that the com.mathworks Java packages will be removed.
+  MathWorks' own Visual Studio Code debug adapter reaches the same prompt
+  through a P-coded connector that user code cannot call.
+
+- Because commands go through that queue, every request runs at the
+  prompt, not in the timer: the timer queues `vimserver.instance().next()`,
+  which pops a request and evaluates it in the prompt's workspace. A stop
+  inside it leaves next() suspended and the timer free. That is also why
+  `evalin('caller')` reaches the selected frame: the caller of a method
+  run at K>> is the frame's workspace.
+
+- `system_dependent('IsDebugMode')` says whether the prompt is a K>>. It is
+  what the VS Code adapter asks, and it is false while user code sits in
+  pause(), when timers also fire. Used to tell a stop from a pause.
+
+- One line per consoleEval. Text after `dbstep;` on the same line is
+  dropped, and a line queued behind `dbstep` or `dbcont` runs only when the
+  prompt is next reached. vimserver.m relies on that: it queues
+  `vimserver.instance().mark()` after every debugger command, and mark()
+  runs at the next stop, where it reports the position, or at the idle
+  prompt after the code ended, where it reports a run that dbquit threw
+  away.
+
+- `dbquit` under `matlab -batch` ends the process: it abandons the one
+  statement -batch was given, and try/catch cannot hold it. So the session
+  runs as `-nodesktop -r` at an interactive prompt instead, which survives
+  dbquit and idles for the next request. Two consequences on Windows: a
+  command window would open and take the focus as it appeared, so
+  `-noDisplayDesktop` keeps it from existing; and nothing is written to
+  stdout, so the log comes from `-logfile`.
+
+- The first stop in that mode spent ten seconds bringing up Matlab's
+  JavaScript editor to show the line. The preference
+  `EditorGraphicalDebugging`, set off, cuts that to a tenth of a second.
+  The session runs with a MATLAB_PREFDIR of its own, matlab/prefs/, so the
+  setting never reaches a desktop Matlab.
+
+- `com.mathworks.jmi.Matlab.eval` from a timer deadlocks the session; it is
+  not used. `-noDisplayDesktop`, which the VS Code extension passes and
+  which is what stops the command window from ever appearing, breaks
+  `fprintf` with arguments written to stdout in this release ("Error
+  writing to output stream"); `disp` and `sprintf` are fine, and code
+  evaluated for Vim is captured by `evalc` and never reaches stdout, so
+  the session's own log lines are the only ones affected and are written
+  with disp(sprintf(...)). `-minimize` plus hiding the window from the
+  watchdog was the first answer and still took the focus for the second
+  or two before the window was hidden.
+
+What to do when a release breaks it. Every call above except consoleEval is
+documented or has a documented fallback. If consoleEval goes, the
+alternative is the conditional-breakpoint hook: `dbstop in f at n if
+hook()` calls hook() in the frame's workspace before stopping, where
+evalin and assignin on 'caller' work and returning false keeps running.
+That gives inspection without a K>> prompt at all, at the cost of
+simulating :Over and :Step with breakpoints on every line, and of no way to
+abandon a run. Before that, look at what MathWorks' adapter does in the new
+release (github.com/mathworks/MATLAB-language-server, src/debug).
+
+==============================================================================
+7. Limits                                                *matlabdebug-limits*
+
+- Output is not streamed; see |matlabdebug-output|.
+- A request made while the code is running but not stopped, in a pause()
+  say, waits until it stops or ends. Breakpoints cannot be set mid-run.
+- `input()` in the running code waits on the hidden command window and
+  never returns. Under -batch it raised an error instead. |:MatlabStop|
+  is the way out.
+- Only line breakpoints, and only one condition per line. Stepping is by
+  line as well: Matlab's `dbstep` runs a whole line, so three statements
+  on one line are one |:Over|. Nothing stops Matlab inside a line; put
+  the statements on lines of their own to step through them.
+- A stop reached inside |:Matlab| while another run is already stopped (a
+  nested K>>) is reported like any other, with the outer frames below the
+  inner ones. :Stop there abandons the inner evaluation and returns to the
+  outer stop; a second :Stop abandons the run. |:Run| is refused while
+  stopped.
+- The stack window shows frames with a file; anonymous functions and
+  command-line frames are folded into their callers.
+- Stepping into a function in a file not yet loaded opens it in the
+  source window; stepping into a built-in stops at the next line instead,
+  as `dbstep in` does.
+- |:Over| on the last line of a script, or |:Finish| from the outermost
+  frame, ends the run: Matlab's own "End of script" stop and the stop it
+  would make in the session's plumbing are stepped past for you.
+
+==============================================================================
+8. Settings                                            *matlabdebug-settings*
+
+                                                       *g:matlabdebug_width*
+g:matlabdebug_width     Width of the variables and stack column. Default
+                        45.
+
+                                                  *g:matlabdebug_break_sign*
+g:matlabdebug_break_sign
+                        The breakpoint sign's text, one or two cells.
+                        Default ●.
+
+                                                    *g:matlabdebug_pc_sign*
+g:matlabdebug_pc_sign   Text in the margin of the line Matlab is stopped
+                        on. Default empty: the line's highlight is enough.
+                        Vim's termdebug uses =>.
+
+The highlight groups are `debugPC` for the stopped line and
+`debugBreakpoint` for the sign, the same as |terminal-debug| uses;
+colors/custom.vim links both.
+
+The session's own settings, port, idle timeout and timeouts, are
+|matlabserver-settings|.
+
+ vim:tw=78:ts=8:ft=help:norl:

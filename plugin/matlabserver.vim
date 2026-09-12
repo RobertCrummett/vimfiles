@@ -16,8 +16,8 @@
 " The session is a separate Matlab process with its own workspace. It does
 " not share anything with a Matlab desktop you have open, and does not stop
 " you opening one: an Individual licence lets the same user run several
-" sessions at once. Keep the desktop for the debugger; this one is for
-" running things without waiting.
+" sessions at once. It has no desktop but it does have a prompt, which is
+" what plugin/matlabdebug.vim debugs at.
 "
 " g:matlabserver_port    port to listen on (51763)
 " g:matlabserver_timeout how long to wait for a reply, ms (60000)

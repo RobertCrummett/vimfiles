@@ -4,7 +4,8 @@
 Keeps a Matlab session alive in the background and talks to it over a
 loopback socket, so running something costs milliseconds instead of the five
 seconds Matlab needs to start. Lives in plugin/matlabserver.vim,
-autoload/matlabserver.vim and matlab/server.m.
+autoload/matlabserver.vim, matlab/server.m and matlab/vimserver.m. The
+debugger, |matlabdebug|, is built on it.
 
 1. Commands                                     |matlabserver-commands|
 2. The session                                  |matlabserver-session|
@@ -54,11 +55,32 @@ The session is its own Matlab process with its own workspace. It shares
 nothing with a Matlab desktop you have open, and it does not stop you
 opening one: an Individual licence lets the same user run several sessions
 at once. This was measured, not assumed - one session was held open while a
-second started, and both ran.
+second started, and both ran. Variables set by |:Matlab| are not visible to
+the desktop and vice versa.
 
-So keep the desktop for the debugger, where the GUI earns its keep, and use
-this one for running things without waiting. Variables set by |:Matlab| are
-not visible to the desktop and vice versa.
+It runs without the desktop but at an interactive prompt: >
+
+    matlab -nodesktop -nosplash -noDisplayDesktop -wait
+           -logfile server.log -r "server(51763, 1800)"
+<
+and not `-batch`, which it used to be. The debugger needs a prompt for a
+stop to return to, and `dbquit` under -batch ends the process; see
+|matlabdebug-workaround|. server() opens the socket, starts a timer that
+polls it, and returns, so the prompt sits idle between requests. Each
+request is queued to that prompt and evaluated there, in the base
+workspace, or, while the debugger is stopped, in the selected frame.
+
+On Windows -nodesktop alone opens a "MATLAB Command Window", and that
+window took the focus from Vim as it appeared, a couple of seconds after
+:MatlabStart. -noDisplayDesktop keeps it from existing at all, so nothing
+of the session is visible and nothing takes the focus. Should a window
+appear anyway, the watchdog (autoload/watchdog.vim) hides it. Nothing is
+written to stdout in that mode, hence -logfile; matlab/server.log is that
+file, and the "Error on flush" it opens with is that mode's harmless
+complaint about the stdout it does not have. The session also gets a
+preferences folder of its own, matlab/prefs/, through MATLAB_PREFDIR: one
+preference has to be changed for the debugger, and it should not reach a
+desktop you use.
 
 Round trips measured on this machine, against a five second cold start: >
 
@@ -68,10 +90,17 @@ Round trips measured on this machine, against a five second cold start: >
     y = 2+2                          1.3 ms
     two 400x400 SVDs                  88 ms
 <
-The socket comes from Java's ServerSocket rather than `tcpserver`, which
+The socket comes from Java's nio channels rather than `tcpserver`, which
 needs the Instrument Control Toolbox; Matlab always ships a JVM. It binds
 loopback only and refuses anything else, because it evaluates whatever it is
 sent.
+
+The protocol is described at the top of matlab/vimserver.m: one request per
+line, tagged with an id that the reply carries back, so that replies can
+interleave when a run is stopped in the debugger. Vim sends one request at
+a time and reads the replies through a channel callback; |:Matlab| and
+|:make| wait on top of that, sleeping in small steps, which is when the
+callback runs.
 
 ==============================================================================
 3. :make and the quickfix list                             *matlabserver-make*
@@ -83,7 +112,10 @@ sent.
                         session first if there is not one. With ! the cursor
                         stays put, the way :make! differs from |:make|.
 
-Typing |:make| in a matlab buffer runs :MatlabMake. >
+Typing |:make| in a matlab buffer runs :MatlabMake. While the debugger is
+open, :MatlabMake and |:MatlabRun| both do what its |matlabdebug-:Run|
+does: breakpoints are sent again first, and the run is followed in the
+debugger's windows. >
 
     :make
     :clist
@@ -148,9 +180,9 @@ day, so it closes itself. It shuts down after |g:matlabserver_idle| seconds
 with nothing to do, thirty minutes by default, and Vim reports that the
 session exited the next time it looks.
 
-The clock covers waiting for a client and waiting for a command from one. It
-does not run while a command is being evaluated, so a long computation is
-never cut short however long it takes.
+The clock covers waiting for a client and waiting for a request from one.
+It does not run while a request is being evaluated, nor while the debugger
+is stopped, so a long computation is never cut short however long it takes.
 
 When a session ends without being asked to, Vim says so the next time it
 looks: >
@@ -161,20 +193,22 @@ looks: >
 An exit you asked for with |:MatlabStop| is not reported that way, and an
 exit with a non-zero status points at matlab/server.log instead.
 
-The timeout is enforced inside server.m rather than by a Vim timer, so it
+The timeout is enforced inside vimserver.m rather than by a Vim timer, so it
 still fires if Vim is killed outright and never gets to clean up. Before
 that, the session is started under the same watchdog as the llm plugin's
 server (autoload/watchdog.vim): a PowerShell wrapper that notices Vim's
-process is gone and kills the Matlab process tree within a second, MATLAB.exe
-included. Leaving Vim normally ends the session at once through Vim's own job
-teardown; the watchdog is for the crash. Leaving
-Vim normally sends a quit through |VimLeavePre| as well, and does not wait
-for the answer: Matlab reads it and shuts down in its own time, a second or
-two of JVM teardown later, instead of being cut off mid-write.
+process is gone, sends the session a quit over its socket, and kills the
+Matlab process tree if it is still there five seconds later. Leaving Vim
+normally ends the session through Vim's own job teardown; the watchdog is
+for the crash. Leaving Vim normally sends a quit through |VimLeavePre| as
+well, and does not wait for the answer: Matlab reads it and shuts down in
+its own time, a second or two of JVM teardown later, instead of being cut
+off mid-write. Killing Matlab outright is avoided where it can be: that is
+what brings up its crash reporter.
 
-A client that gives up on a slow command and closes its socket does not end
-the session. Only the idle timeout does; the accept loop takes the next
-connection and the abandoned reply goes nowhere.
+A client that gives up on a slow request does not end the session, and no
+longer closes the connection: the late reply is matched by its id and
+dropped. Only the idle timeout ends it.
 
 ==============================================================================
 5. Output                                                *matlabserver-output*
@@ -212,10 +246,11 @@ A parse error has no stack; Matlab puts the position in the message as
 so it lands in the quickfix list like any other error. An error with no
 position at all is reported as `Error: message`.
 
-Commands run in Matlab's base workspace, which is empty under -batch, not in
-server.m's own. A script that opens with `clear all`, or assigns to a name
-server.m uses, therefore clears only your variables; before this it took
-the session down.
+Commands run in Matlab's base workspace, not in the session's own. A script
+that opens with `clear all`, or assigns to a name the session uses,
+therefore clears only your variables. The session's state is held by a
+locked object that `clear all` and `clear classes` leave alone, and the
+breakpoints survive both as well.
 ==============================================================================
 6. Settings                                            *matlabserver-settings*
 
@@ -230,10 +265,9 @@ g:matlabserver_idle     Seconds of quiet before the session closes itself.
                                                     *g:matlabserver_timeout*
 g:matlabserver_timeout  How long to wait for a reply, in milliseconds.
                         Default 60000. Raise it if you run something slow
-                        with |:MatlabRun|. Giving up closes the connection,
-                        so the late reply cannot be read as the answer to
-                        the next command; the session itself carries on with
-                        what it was told to do, and the message says so.
+                        with |:MatlabRun|. The session carries on with what
+                        it was told to do, and the message says so; the
+                        late reply is dropped when it comes.
 
                                              *g:matlabserver_start_timeout*
 g:matlabserver_start_timeout
