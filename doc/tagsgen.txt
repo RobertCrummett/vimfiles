@@ -15,10 +15,19 @@ autoload/tagsgen.vim.
 1. Command                                                   *tagsgen-command*
 
                                                                   *:MakeTags*
-:MakeTags [dir]         Scan [dir] (default: the current directory)
-                        recursively and write [dir]/tags. Reports the number
-                        of tags, files and seconds. Completes directory
-                        names.
+:MakeTags [dir] [into]  Scan [dir] (default: the current directory)
+                        recursively and write [into]/tags (default:
+                        [dir]/tags). Reports the number of tags, files and
+                        seconds. Completes directory names.
+
+File names in the tags file are relative to [into], climbing out with `../`
+where [dir] is not below it, so a tags file can live in one directory and
+describe another. Vim's default 'tags' finds `./tags` and `tags`, so working
+in a directory that uses another project's code needs no 'tags' setting: >
+
+    :MakeTags ~/Documents/presentation .
+<
+Write a space in a directory name as `\ `.
 
 A scan that takes longer than a second says how far it has got, once a
 second: >

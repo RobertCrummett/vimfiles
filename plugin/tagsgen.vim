@@ -1,7 +1,9 @@
 " tagsgen: write a tags file with Vim alone, no ctags needed.
 "
-"   :MakeTags [dir]     scan dir (default: current directory) recursively
-"                       and write dir/tags
+"   :MakeTags [dir] [into]
+"                       scan dir (default: current directory) recursively
+"                       and write into/tags (default: dir/tags), with file
+"                       names relative to into
 "
 " Definitions are found with the regexes in g:tagsgen_patterns, keyed by
 " filetype; extensions map to filetypes through g:tagsgen_filetypes. Both
@@ -11,7 +13,7 @@ if exists('g:loaded_tagsgen')
 endif
 let g:loaded_tagsgen = 1
 
-command! -bar -nargs=? -complete=dir MakeTags call tagsgen#make(<q-args>)
+command! -bar -nargs=* -complete=dir MakeTags call tagsgen#make(<f-args>)
 
 " Directory names that are never descended into.
 let g:tagsgen_exclude = get(g:, 'tagsgen_exclude',

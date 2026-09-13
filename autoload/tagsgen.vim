@@ -4,6 +4,29 @@ function! s:slash(path) abort
   return substitute(a:path, '\\', '/', 'g')
 endfunction
 
+" A directory as an absolute, forward-slashed path with no trailing slash.
+function! s:dir(path) abort
+  return substitute(s:slash(fnamemodify(a:path, ':p')), '/$', '', '')
+endfunction
+
+" A file name as written in a tags file that lives in directory base:
+" relative to base, which is how Vim reads it ('tagrelative'), climbing out
+" with ../ where the file is not below it. Absolute when the two share
+" nothing, as for a file on another drive.
+function! s:relative(path, base) abort
+  let l:p = split(a:path, '/', 1)
+  let l:b = split(a:base, '/', 1)
+  let l:n = 0
+  while l:n < len(l:p) - 1 && l:n < len(l:b)
+    \ && (has('win32') ? l:p[l:n] ==? l:b[l:n] : l:p[l:n] ==# l:b[l:n])
+    let l:n += 1
+  endwhile
+  if l:n == 0
+    return a:path
+  endif
+  return repeat('../', len(l:b) - l:n) . join(l:p[l:n :], '/')
+endfunction
+
 " Files under root worth scanning: [path, filetype] pairs.
 "
 " A readdirex() walk, not glob('**'): glob has to descend into node_modules
@@ -79,21 +102,28 @@ function! s:scan(path, rel, ft) abort
   return l:tags
 endfunction
 
-function! tagsgen#make(dir) abort
-  let l:root = s:slash(fnamemodify(empty(a:dir) ? getcwd() : a:dir, ':p'))
-  let l:root = substitute(l:root, '/$', '', '')
-  if !isdirectory(l:root)
-    echohl ErrorMsg | echomsg 'MakeTags: not a directory: ' . l:root | echohl None
+" :MakeTags [dir] [into]: scan dir, write into/tags. into defaults to dir,
+" so a tags file can sit in one directory and describe another.
+function! tagsgen#make(...) abort
+  if a:0 > 2
+    echohl ErrorMsg | echomsg 'MakeTags: expected [dir] [into]' | echohl None
     return
   endif
+  let l:root = s:dir(a:0 > 0 && !empty(a:1) ? a:1 : getcwd())
+  let l:into = a:0 > 1 ? s:dir(a:2) : l:root
+  for l:d in [l:root, l:into]
+    if !isdirectory(l:d)
+      echohl ErrorMsg | echomsg 'MakeTags: not a directory: ' . l:d | echohl None
+      return
+    endif
+  endfor
   let l:start = reltime()
   let l:files = s:files(l:root)
   let l:tags = []
-  let l:prefix = len(l:root) + 1
   let l:done = 0
   let l:shown = 0.0
   for [l:path, l:ft] in l:files
-    call extend(l:tags, s:scan(l:path, strpart(l:path, l:prefix), l:ft))
+    call extend(l:tags, s:scan(l:path, s:relative(l:path, l:into), l:ft))
     let l:done += 1
     " A scan that runs long says how far it is, once a second. A quick one
     " says nothing until the summary.
@@ -112,7 +142,7 @@ function! tagsgen#make(dir) abort
     \ "!_TAG_FILE_SORTED\t1\t/0=unsorted, 1=sorted, 2=foldcase/",
     \ "!_TAG_PROGRAM_NAME\ttagsgen.vim\t//",
     \ ]
-  let l:out = l:root . '/tags'
+  let l:out = l:into . '/tags'
   if writefile(l:header + l:tags, l:out) != 0
     echohl ErrorMsg | echomsg 'MakeTags: could not write ' . l:out | echohl None
     return
