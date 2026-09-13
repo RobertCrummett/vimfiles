@@ -92,11 +92,33 @@ function! s:Accents() abort
   hi! link vimFunctionScope customLightPurple
   hi! link vimCommentTitle Comment
 
-  " Rust: macro calls read like calls; lifetimes and escapes are special.
+  " Rust, in Racket's colours. Functions and macro calls are lavender;
+  " assert! and panic! are macros too, but upstream moves them to PreCondit,
+  " which quiet leaves plain. Text literals are light pink: "", b"", r#""#
+  " and 'c', their quotes included. Escapes, \ line continuations, true and
+  " false, lifetimes, #[attributes] (the traits in derive(...) included) and
+  " the $x and $( )* of macro_rules! are notation, light purple. Loop labels
+  " and ? are jumps, hot pink. So is unsafe, like Matlab's global and
+  " persistent: rare, and where the compiler stops checking. The other
+  " keywords, mut and const included, types and numbers stay plain.
   " Doc comments (//! /// /** */) are comments, not SpecialComment.
-  hi! link rustMacro    customLavendar
-  hi! link rustEscape   customLightPurple
-  hi! link rustLifetime customLightPurple
+  hi! link rustMacro                 customLavendar
+  hi! link rustAssert                customLavendar
+  hi! link rustPanic                 customLavendar
+  hi! link rustString                customLightPink
+  hi! link rustStringDelimiter       customLightPink
+  hi! link rustCharacter             customLightPink
+  hi! link rustEscape                customLightPurple
+  hi! link rustStringContinuation    customLightPurple
+  hi! link rustBoolean               customLightPurple
+  hi! link rustLifetime              customLightPurple
+  hi! link rustAttribute             customLightPurple
+  hi! link rustDerive                customLightPurple
+  hi! link rustDeriveTrait           customLightPurple
+  hi! link rustMacroVariable         customLightPurple
+  hi! link rustMacroRepeatDelimiters customLightPurple
+  hi! link rustQuestionMark          customPink
+  hi! link rustUnsafeKeyword         customPink
   hi! link rustCommentLineDoc  Comment
   hi! link rustCommentBlockDoc Comment
 
