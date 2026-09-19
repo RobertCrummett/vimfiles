@@ -84,13 +84,11 @@ function! s:Accents() abort
   hi! link vimAutocmdBufferPattern customLightPurple
   hi! link vimMapMod        customLightPurple
   hi! link vimBracket       customLightPurple
-  " <SID> in a function name is vimFunctionSID, which already defaults to
-  " vimNotation, so it needs no link of its own.
   hi! link vimOption        customLightPurple
-  " Scope prefixes such as a: b: g: l: s: on variables and functions.
   hi! link vimVarScope      customLightPurple
   hi! link vimFunctionScope customLightPurple
-  hi! link vimCommentTitle Comment
+  hi! link vimCommentTitle  Comment
+  hi! link vimCommentString vimLineComment
 
   " Rust, in Racket's colours. Functions and macro calls are lavender;
   " assert! and panic! are macros too, but upstream moves them to PreCondit,
@@ -156,8 +154,12 @@ function! s:Accents() abort
   " Code spans and math, one colour: `x` and $x$ are both "this is not
   " prose, read it literally". The runtime leaves markdownCode with no link
   " at all, so the spans were plain; the math regions come from
-  " after/syntax/markdown.vim. The same light purple as Typst math.
+  " after/syntax/markdown.vim. The same light purple as Typst math. Code
+  " blocks, fenced (``` and ~~~) or indented, are markdownCodeBlock, which
+  " upstream leaves on String and quiet leaves plain, so only the fences
+  " were coloured; the whole block now matches them.
   hi! link markdownCode          customLightPurple
+  hi! link markdownCodeBlock     customLightPurple
   hi! link markdownCodeDelimiter customLightPurple
   hi! link markdownMath          customLightPurple
   hi! link markdownMathBlock     customLightPurple

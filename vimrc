@@ -86,7 +86,7 @@ endif
 " Every .m file is Matlab. Left to itself Vim reads the file and may decide
 " on octave (a # comment, an endfunction), which has none of the Matlab
 " plugins' K or :make and is never what is being written here.
-let g:filetype_m = 'matlab'
+let g:filetype_m='matlab'
 
 " This disables netrw
 let g:loaded_netrw=1
@@ -116,11 +116,6 @@ silent! execute 'helptags' fnameescape(expand('<sfile>:p:h') . '/doc')
 
 if executable('rg')
   set grepformat+=%f:%l:%c:%m grepprg=rg\ --vimgrep\ -uu
-endif
-
-if executable('lynx') && !has('win32')
-  let g:Openprg='lynx' " Openprg is not working as I expect. Not sure why.
-  nn gx :exe '!lynx ' . shellescape(substitute(expand("<cfile>", 1), '#', '%23', 'g'))<CR><CR>
 endif
 
 set nrformats-=octal
