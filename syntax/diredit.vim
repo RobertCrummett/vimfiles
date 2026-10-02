@@ -2,6 +2,11 @@ if exists('b:current_syntax')
   finish
 endif
 
+" File names are not prose: with 'spell' on in the window, nothing here is
+" checked. ('spell' itself is left as it is, so a file opened from the
+" listing takes it over.)
+syntax spell notoplevel
+
 " Lines are "id<Tab>details<Tab>name". The id and both tabs are hidden;
 " the details column is dimmed; the name is what you edit.
 syntax match direditId      /^\d\+\t/ conceal

@@ -31,6 +31,8 @@ augroup diredit
   " Opening a directory (:e ., vim .) lands in a listing instead of an
   " empty buffer.
   autocmd BufEnter    * ++nested call diredit#hijack(expand('<amatch>'))
+  " A listing never stays the alternate file: CTRL-^ and :b# skip it.
+  autocmd BufEnter,WinEnter * call diredit#alternate()
 augroup END
 
 if maparg('-', 'n') ==# ''

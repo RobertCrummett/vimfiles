@@ -81,7 +81,35 @@ function! diredit#open(dir) abort
     return s:error('Not a directory: ' . l:dir)
   endif
   " silent: the "N lines --50%--" file message means nothing for a listing.
-  execute 'silent edit' fnameescape('diredit://' . l:dir)
+  " From one listing to the next the alternate file stays as it is: the file
+  " the browsing started from.
+  execute 'silent' (exists('b:diredit_dir') ? 'keepalt ' : '') . 'edit' fnameescape('diredit://' . l:dir)
+endfunction
+
+" A listing is not a file to go back to with CTRL-^ or :b#. Vim makes it the
+" alternate file all the same when it is left, so this puts things right as
+" the next buffer is entered: the alternate file becomes the last file the
+" window showed before the listings, or, when that is where we are now, the
+" file that was its alternate then. From A through a listing into B, :b#
+" leads to A; from A into a listing and back, it leads where it led before.
+" w:diredit_last is that file and its alternate, noted each time a file is
+" entered (when a buffer is left, Vim has already changed the alternate).
+function! diredit#alternate() abort
+  if bufname('%') =~# '^diredit://'
+    return
+  endif
+  if bufname('#') =~# '^diredit://'
+    " Nothing to go back to: better none than the listing.
+    let l:alt = bufnr('%')
+    for l:buf in get(w:, 'diredit_last', [])
+      if l:buf != bufnr('%') && bufexists(l:buf) && bufname(l:buf) !~# '^diredit://' && !isdirectory(bufname(l:buf))
+        let l:alt = l:buf
+        break
+      endif
+    endfor
+    let @# = l:alt
+  endif
+  let w:diredit_last = [bufnr('%'), bufnr('#')]
 endfunction
 
 function! diredit#open_parent() abort

@@ -30,6 +30,16 @@ Editing a directory path directly, as in `:e .` or starting Vim with a
 directory argument, also opens a listing. The buffer is named
 `diredit://{path}`, so `:e diredit://C:/some/dir` works too.
 
+                                                           *diredit-alternate*
+A listing is a way to a file, not a place to go back to. It is unlisted, so
+`:bnext` passes it by, and it never stays the alternate file: from file A
+through one or more listings into file B, |CTRL-^| and `:b#` in B lead to A.
+Going from A into a listing and straight back leaves A's alternate file as
+it was. Inside a listing the alternate file is the file the browsing
+started from, so `CTRL-^` there returns to it. The |jumplist| is another
+matter: Vim notes the listing there as it is left, `:keepjumps` or not, so
+|CTRL-O| can still come back to it.
+
 ==============================================================================
 2. The listing                                               *diredit-listing*
 
