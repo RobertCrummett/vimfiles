@@ -10,6 +10,7 @@
 # spell/geophysics/words.txt or reject.txt changes. The word lists themselves
 # are tracked; only the binary output is not.
 /spell/*.spl
+/spell/*.add
 /spell/*.sug
 
 # Corpus for building the geophysics word list, refreshed by fetch-corpus.py.

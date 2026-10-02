@@ -121,13 +121,27 @@ function! s:Accents() abort
   hi! link rustCommentBlockDoc Comment
 
   " Python (pythonFunctionCall is defined in after/syntax/python.vim).
+  hi! link pythonInclude          customPink
+  hi! link pythonRepeat           customPink
+  hi! link pythonOperator         customPink
+  hi! link pythonStatement        customPink
+  hi! link pythonException        customPink
+  hi! link pythonConditional      customPink
+  hi! link pythonString           customLightPink
+  hi! link pythonFString          customLightPink
+  hi! link pythonQuotes           customLightPink
   hi! link pythonFunctionCall     customLavendar
   hi! link pythonEscape           customLightPurple
   hi! link pythonFStringDelimiter customLightPurple
 
+  " DOS Batch
+  hi! link dosbatchSwitch      customLightPurple
+  hi! link dosbatchConditional customLavendar
+  hi! link dosbatchOperator    customLavendar
+  hi! link dosbatchRepeat      customLavendar
+
   " Shell, batch, PowerShell
   hi! link shSpecial      customLightPurple
-  hi! link dosbatchSwitch customLightPurple
   hi! link ps1Function    customLavendar
   " Despite the name, ps1Label matches cmdlet parameters (-Path), not labels.
   hi! link ps1Label       customLightPurple
