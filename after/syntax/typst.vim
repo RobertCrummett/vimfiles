@@ -18,6 +18,120 @@ syntax region typstHashtagDollar
 highlight default link typstMathDelim Special
 
 
+" Math is one colour, whatever is in it. The bundled @typstMath cluster
+" brings in @typstHashtag, so the #(AA, BB) in
+"   $ bal(#(AA, BB), #(CC, DD, EE)) = ... $
+" is coloured as code is elsewhere, and the string in $J_("scatt " sigma)$ has
+" no colour at all. Here the cluster is the bundled one without the code
+" rules, and a # expression gets rules that only keep track of where it
+" ends: its delimiters nest, and a string or math inside it may hold a ) or
+" a $ that must not end anything. All of it is typstMathCode, which
+" colors/custom.vim links like the math around it.
+syntax cluster typstMath
+    \ contains=@typstCommon
+            \ ,typstMathCode
+            \ ,typstMathHashParen
+            \ ,typstMathHashBrace
+            \ ,typstMathHashBracket
+            \ ,typstMathIdentifier
+            \ ,typstMathFunction
+            \ ,typstMathNumber
+            \ ,typstMathSymbol
+            \ ,typstMathBold
+            \ ,typstMathScripts
+            \ ,typstMathQuote
+
+" #name, #name.field, and the arguments that follow at once.
+syntax match typstMathCode
+    \ contained
+    \ /#\K\k*\%(\.\K\k*\)*/
+    \ nextgroup=typstMathCodeParen,typstMathCodeBracket
+" #( ), #{ } and #[ ] open only after a #; the plain ones only inside those
+" or as arguments, or every parenthesis of the math itself would be one.
+" matchgroup: without it the ( of #( is open to the contained items, and
+" starts a second region inside the first, which then never ends.
+syntax region typstMathHashParen
+    \ contained
+    \ matchgroup=typstMathCode start=/#(/ end=/)/
+    \ contains=@typstMathCodeIn
+    \ nextgroup=typstMathCodeParen,typstMathCodeBracket
+syntax region typstMathHashBrace
+    \ contained
+    \ matchgroup=typstMathCode start=/#{/ end=/}/
+    \ contains=@typstMathCodeIn
+syntax region typstMathHashBracket
+    \ contained
+    \ matchgroup=typstMathCode start=/#\[/ end=/\]/
+    \ contains=@typstMathCodeIn
+    \ nextgroup=typstMathCodeBracket
+syntax region typstMathCodeParen
+    \ contained
+    \ start=/(/ end=/)/
+    \ contains=@typstMathCodeIn
+    \ nextgroup=typstMathCodeParen,typstMathCodeBracket
+syntax region typstMathCodeBrace
+    \ contained
+    \ start=/{/ end=/}/
+    \ contains=@typstMathCodeIn
+syntax region typstMathCodeBracket
+    \ contained
+    \ start=/\[/ end=/\]/
+    \ contains=@typstMathCodeIn
+    \ nextgroup=typstMathCodeBracket
+syntax region typstMathCodeString
+    \ contained
+    \ start=/"/ skip=/\v\\\\|\\"/ end=/"/
+syntax cluster typstMathCodeIn
+    \ contains=@typstCommon
+            \ ,typstMathCodeParen
+            \ ,typstMathCodeBrace
+            \ ,typstMathCodeBracket
+            \ ,typstMathCodeString
+            \ ,typstMarkupDollar
+
+" The bundled rule draws the quotes of a string in math as String and leaves
+" the text between them without a group.
+syntax clear typstMathQuote
+syntax region typstMathQuote
+    \ contained
+    \ start=/"/ skip=/\\"/ end=/"/
+
+highlight default link typstMathCode        Special
+highlight default link typstMathHashParen   typstMathCode
+highlight default link typstMathHashBrace   typstMathCode
+highlight default link typstMathHashBracket typstMathCode
+highlight default link typstMathCodeParen   typstMathCode
+highlight default link typstMathCodeBrace   typstMathCode
+highlight default link typstMathCodeBracket typstMathCode
+highlight default link typstMathCodeString  typstMathCode
+highlight default link typstMathQuote       typstMathCode
+
+
+" Raw text. The bundled rules draw the ``` fences with the standard group
+" Macro, which no colorscheme can single out. The same two regions, with the
+" fences in a group of their own that colors/custom.vim colours like the
+" text between them.
+syntax clear typstMarkupRawBlock typstMarkupCodeBlockTypst
+syntax region typstMarkupRawBlock
+    \ matchgroup=typstMarkupRawDelim start=/```\w*/
+    \ matchgroup=typstMarkupRawDelim end=/```/ keepend
+syntax region typstMarkupCodeBlockTypst
+    \ matchgroup=typstMarkupRawDelim start=/```typst/
+    \ matchgroup=typstMarkupRawDelim end=/```/ contains=@typstCode keepend
+    \ concealends
+
+highlight default link typstMarkupRawDelim Macro
+
+
+" The bundled rule spell checks strings in code. They are file names, font
+" names and keys far more often than prose ("figures/potassium.png" flags
+" "png"), so this is the same rule without its contains=@Spell.
+syntax clear typstCodeString
+syntax region typstCodeString
+    \ contained
+    \ start=/"/ skip=/\v\\\\|\\"/ end=/"/
+
+
 " The bundled bold and italic rules are single `syntax match` patterns that
 " end at the first * or _ after a non-blank, wherever it falls. In
 "   _the functions $J_(0 nu)$, and $h=0$_

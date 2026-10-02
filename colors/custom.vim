@@ -17,12 +17,21 @@ function! s:Accents() abort
   "   customLightPurple  special characters, math, options, key notation
   "   customPink         labels, references, links, jumps
   "   customLightBlue    text that completion put or offers to put in the buffer
-  "   customLightPink    string and character literals
+  "   customLightPink    string and character literals, raw text
   hi customLavendar    guifg=#aa9fff guibg=NONE gui=NONE ctermfg=147 ctermbg=NONE cterm=NONE
   hi customLightPurple guifg=#ff9fff guibg=NONE gui=NONE ctermfg=219 ctermbg=NONE cterm=NONE
   hi customPink        guifg=#ff00af guibg=NONE gui=NONE ctermfg=199 ctermbg=NONE cterm=NONE
   hi customLightPink   guifg=#ffafd7 guibg=NONE gui=NONE ctermfg=218 ctermbg=NONE cterm=NONE
   hi customLightBlue   guifg=#5fafff guibg=NONE gui=NONE ctermfg=75  ctermbg=NONE cterm=NONE
+
+  " Typst code while 'spell' is on (plugin/typstprose.vim): the grey of
+  " comments without their bold, so that comments still stand out from it.
+  if &background ==# 'dark'
+    hi customMuted guifg=#707070 guibg=NONE gui=NONE ctermfg=242 ctermbg=NONE cterm=NONE
+  else
+    hi customMuted guifg=#626262 guibg=NONE gui=NONE ctermfg=241 ctermbg=NONE cterm=NONE
+  endif
+  hi! link typstProseCode customMuted
 
   " TODO markers stay as quiet as the comments they live in.
   hi! link Todo Comment
@@ -68,6 +77,18 @@ function! s:Accents() abort
   hi! link typstMathNumber         customLightPurple
   hi! link typstMathIdentifier     customLightPurple
   hi! link typstMathFunction       customLightPurple
+  " Math is one colour all through: the # expressions in it, such as the
+  " #(AA, BB) that groups arguments, and its "strings" link to typstMathCode
+  " (after/syntax/typst.vim) instead of taking the colours of code.
+  hi! link typstMathCode           customLightPurple
+  " Raw text, `inline` and in ``` blocks, fences included (their group is
+  " defined in after/syntax/typst.vim): text to be read literally, so the
+  " colour of string literals. That sets it apart from math without the
+  " weight of hot pink. In a ```typst block the code keeps its own colours.
+  hi! link typstMarkupRawInline      customLightPink
+  hi! link typstMarkupRawBlock       customLightPink
+  hi! link typstMarkupRawDelim       customLightPink
+  hi! link typstMarkupCodeBlockTypst customLightPink
 
   " Vimscript: keywords are pink so they stand apart from function names,
   " which stay lavender like functions everywhere else. Ex commands (let,
@@ -240,6 +261,33 @@ function! s:Accents() abort
   hi! link synexploreLabel   customLavendar
   hi! link synexploreYours   customLightPurple
   hi! link synexploreOwner   customLightPurple
+
+  " Spelling: a colour for each kind of mark, and an underline.
+  "   SpellBad    not a word                              hot pink
+  "   SpellCap    should start with a capital             light blue
+  "   SpellLocal  a word, but of another region (en_gb)   lavender
+  "   SpellRare   a word, but hardly ever used            light purple
+  "
+  " The underline has a colour of its own (guisp) in the GUI only. In a
+  " terminal Vim sends guisp as t_8u, ESC[58;2;R;G;Bm, and ctermul as t_AU,
+  " ESC[58;5;Nm. The Windows console does not read 58 in that form and takes
+  " the numbers as separate codes: 2 is faint, 5 is blink, and a 0 among R, G
+  " and B resets every attribute. So a flagged word came out dim, or with no
+  " colour and no underline at all, and the dimness ran on over the text
+  " after it until the next reset; quiet's own Spell* groups had the same
+  " trouble. Clearing t_8u in vimrc does not last, Vim puts it back whenever
+  " 'termguicolors' changes, so there is no guisp or ctermul here instead and
+  " the underline is drawn in the colour of the text.
+  hi SpellBad   guifg=#ff00af guibg=NONE guisp=NONE gui=undercurl ctermfg=199 ctermbg=NONE cterm=underline term=underline
+  hi SpellCap   guifg=#5fafff guibg=NONE guisp=NONE gui=undercurl ctermfg=75  ctermbg=NONE cterm=underline term=underline
+  hi SpellLocal guifg=#aa9fff guibg=NONE guisp=NONE gui=undercurl ctermfg=147 ctermbg=NONE cterm=underline term=underline
+  hi SpellRare  guifg=#ff9fff guibg=NONE guisp=NONE gui=undercurl ctermfg=219 ctermbg=NONE cterm=underline term=underline
+  if has('gui_running')
+    hi SpellBad   guisp=#ff00af
+    hi SpellCap   guisp=#5fafff
+    hi SpellLocal guisp=#aa9fff
+    hi SpellRare  guisp=#ff9fff
+  endif
 
 endfunction
 
