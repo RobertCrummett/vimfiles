@@ -222,6 +222,49 @@ endfunction
 
 " ------------------------------------------------------------- cursor
 
+" Whether a group sets the colour of the text.
+function! s:has_fg(name) abort
+  let l:id = synIDtrans(hlID(a:name))
+  return !empty(synIDattr(l:id, 'fg#')) || !empty(synIDattr(l:id, 'fg'))
+endfunction
+
+" The text properties that cover a position, lowest priority first, each
+" with the highlight, priority and combine setting of its type.
+function! s:props_at(lnum, col) abort
+  let l:found = []
+  for l:p in exists('*prop_list') ? prop_list(a:lnum) : []
+    " A property with no text of its own (virtual text aside) covers nothing.
+    if !has_key(l:p, 'type') || a:col < l:p.col || a:col >= l:p.col + l:p.length
+      continue
+    endif
+    let l:t = prop_type_get(l:p.type, {'bufnr': bufnr()})
+    if empty(l:t)
+      let l:t = prop_type_get(l:p.type)
+    endif
+    call add(l:found, {'type': l:p.type, 'highlight': get(l:t, 'highlight', ''),
+      \ 'priority': get(l:t, 'priority', 0), 'combine': get(l:t, 'combine', 1)})
+  endfor
+  return sort(l:found, {a, b -> a.priority - b.priority})
+endfunction
+
+" The spelling mark on a position: [word, group], or ['', ''] when the spell
+" checker flags nothing there. spellbadword() looks from the cursor on, and
+" moves it; it also knows where the syntax says not to check.
+function! s:spell_at(lnum, col) abort
+  let l:view = winsaveview()
+  try
+    call cursor(a:lnum, a:col)
+    let [l:word, l:kind] = spellbadword()
+    let l:start = col('.')
+    if empty(l:word) || line('.') != a:lnum || a:col < l:start || a:col >= l:start + len(l:word)
+      return ['', '']
+    endif
+    return [l:word, get({'bad': 'SpellBad', 'caps': 'SpellCap', 'rare': 'SpellRare', 'local': 'SpellLocal'}, l:kind, 'SpellBad')]
+  finally
+    call winrestview(l:view)
+  endtry
+endfunction
+
 function! synexplore#cursor(to_buffer) abort
   let l:lnum = line('.')
   let l:col = col('.')
@@ -257,8 +300,45 @@ function! synexplore#cursor(to_buffer) abort
       call add(l:lines, printf('The innermost item %s is transparent, so %s shows through.', l:raw, l:shown))
     endif
   endif
+
+  " What Vim draws over the syntax colour, in the order it applies them:
+  " text properties, then spelling. l:top is the group that has the last say
+  " on the colour of the text.
+  let l:top = empty(l:final) ? 'Normal' : l:final
+  let l:props = s:props_at(l:lnum, l:col)
+  if !empty(l:props)
+    call add(l:lines, '')
+    call add(l:lines, 'Text properties here. They are drawn over the syntax colour, the')
+    call add(l:lines, 'highest priority last.')
+    for l:p in l:props
+      call add(l:lines, '')
+      if empty(l:p.highlight)
+        call add(l:lines, printf('  %s, priority %d: no highlight', l:p.type, l:p.priority))
+        continue
+      endif
+      call add(l:lines, printf('  %s, priority %d: %s %s', l:p.type, l:p.priority,
+        \ l:p.combine ? 'adds' : 'replaces the syntax colour with', l:p.highlight))
+      call extend(l:lines, s:group_lines(l:p.highlight, '    '))
+      if !l:p.combine || s:has_fg(l:p.highlight)
+        let l:top = l:p.highlight
+      endif
+    endfor
+  endif
+  if &l:spell
+    let [l:word, l:group] = s:spell_at(l:lnum, l:col)
+    call add(l:lines, '')
+    if empty(l:word)
+      call add(l:lines, 'Spelling: ''spell'' is on, and nothing is flagged here.')
+    else
+      call add(l:lines, printf('Spelling: "%s" is flagged, and drawn with %s over all of the above.', l:word, l:group))
+      call extend(l:lines, s:group_lines(l:group, '  '))
+      if s:has_fg(l:group)
+        let l:top = l:group
+      endif
+    endif
+  endif
   call add(l:lines, '')
-  call add(l:lines, 'Colour on screen comes from: ' . (empty(l:final) ? 'Normal' : l:final) . '  (' . s:effective(empty(l:shown) ? 'Normal' : l:shown) . ')')
+  call add(l:lines, 'Colour on screen comes from: ' . l:top . '  (' . s:effective(l:top) . ')')
 
   let l:conceal = synconcealed(l:lnum, l:col)
   if !empty(l:conceal) && l:conceal[0]

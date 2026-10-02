@@ -20,9 +20,15 @@ autoload/synexplore.vim.
                         each item, its rule text, the file and line that
                         defines the rule, the link chain down to the colour,
                         where each link was set, and the colour on screen.
+                        Then what is drawn over the syntax colour: the
+                        text properties that cover the character, and, with
+                        'spell' on, the spelling mark on it (`SpellBad`,
+                        `SpellCap`, `SpellLocal` or `SpellRare`), each with
+                        its group traced the same way. The last line names
+                        the group that ends up colouring the text.
                         Window matches from |:match| and |matchadd()| that
-                        can override syntax are listed too. Move the cursor
-                        and run it again for another spot.
+                        can override all of that are listed too. Move the
+                        cursor and run it again for another spot.
 
 :SynCursor!             Echo a short form of the same report instead of
                         opening a window.
@@ -80,7 +86,9 @@ same place. Among match/region items, the one defined last wins at the same
 position, while an item that started earlier keeps priority until it ends.
 Contained items apply only inside items that list them. A transparent item
 takes the colour of what contains it. The innermost applicable item on the
-stack supplies the colour, and window matches can still override it.
+stack supplies the colour. Over that come text properties, lowest priority
+first, each replacing the syntax colour or adding to it as its type says;
+then the spelling mark; and window matches can still override it all.
 
 Colours in the report. Group names in stack items, link chains and headings
 are drawn in their own highlight, so the colour is visible next to its

@@ -3,7 +3,9 @@
 "
 "   :SynCursor[!]          what applies to the text under the cursor: the
 "                          syntax stack, which item wins, each link chain,
-"                          the rule text, and where every piece was set
+"                          the rule text, and where every piece was set;
+"                          then the text properties and the spelling mark
+"                          drawn over it
 "                          (! opens it in a buffer instead of echoing)
 "   :SynGroup {group}      one highlight group: link chain, colours, source
 "   :SynHighlights [pat]   every highlight group (matching pat), with a
