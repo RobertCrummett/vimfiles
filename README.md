@@ -28,7 +28,14 @@ Because I always come back to this editor, I might as well study the language of
 - **plugin/synexplore.vim** — `:SynCursor[!]`, `:SynGroup {group}`,
   `:SynHighlights [pattern]`, `:SynRules [group]` explain why text is coloured
   the way it is, in searchable buffers, with the file and line each rule or
-  link came from and whether it is yours to edit.
+  link came from and whether it is yours to edit. `:SynCursor` also lists
+  the text properties and the spelling mark drawn over the syntax colour.
+- **plugin/typstprose.vim** — with `:set spell` in a Typst buffer, everything
+  that is not prose turns one grey (comments keep their bold), and
+  `:set nospell` brings the colours back. Code is found by a scanner that
+  follows Typst's own parser rather than the syntax file, so the caption text
+  inside `#figure(caption: [...])` stays prose; it rescans only around an
+  edit, from a timer. See `:help typstprose`.
 - **after/ftplugin/markdown.vim**, **after/syntax/markdown.vim**,
   **autoload/markdown.vim** — `$...$` and `$$...$$` are math, so the `_` in
   `$F_a$` is no longer an error and is coloured like Typst math; `gq` over a
@@ -91,7 +98,7 @@ so nothing takes the focus from Vim.
 Every local plugin has a Vim help file under `doc/`: `:help comments`,
 `:help diredit`, `:help geospell`, `:help llm`, `:help matlabdoc`,
 `:help matlabserver`, `:help matlabdebug`, `:help markdown-local`,
-`:help synexplore`, `:help tagsgen`,
+`:help synexplore`, `:help tagsgen`, `:help typstprose`,
 `:help thesaurus.vim`, `:help sexptutor`, and any command by name, for
 example `:help :SynCursor` or `:help :MakeTags`. The vimrc rebuilds
 `doc/tags` at startup, so edits to the help files show up on the next

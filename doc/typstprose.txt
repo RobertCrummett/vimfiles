@@ -1,0 +1,161 @@
+*typstprose.txt*   Proofread Typst: only the prose stands out   *typstprose-plugin*
+
+                                              *typstprose* *plugin-typstprose*
+While 'spell' is on in a window that shows a Typst buffer, everything that
+is not prose is drawn in one grey, so the text being proofread is all that
+has colour. Lives in plugin/typstprose.vim and autoload/typstprose.vim, with
+no program outside Vim.
+
+1. Use                                          |typstprose-use|
+2. What counts as code                          |typstprose-code|
+3. Why not the syntax file                      |typstprose-why|
+4. Speed                                        |typstprose-speed|
+5. Limits                                       |typstprose-limits|
+
+==============================================================================
+1. Use                                                        *typstprose-use*
+>
+    :set spell          code goes grey, prose and spelling marks stay
+    :set nospell        the usual colours are back
+<
+Nothing else is needed; `:set spell!` and anything that maps to it work the
+same. It also applies when 'spell' is already set as the file opens.
+
+Comments stay as the colorscheme has them. In `custom` that is the same grey
+in bold, so a comment still stands out from the code around it.
+
+The first `:set spell` in a buffer scans it, from the top, in the
+background: a paper of 900 lines is grey in a quarter of a second, a book of
+14000 lines takes some seconds to reach its end. After that the marks stay
+on the text when 'spell' goes off, without a colour, so turning it on again
+is immediate; only what was edited meanwhile is scanned again.
+
+                                                                *g:typstprose*
+g:typstprose            Set to 0 to never grey anything: >
+                            let g:typstprose = 0
+<
+                                                          *g:typstprose_eager*
+g:typstprose_eager      Set to 1 to have the marks made, unseen, as soon as a
+                        Typst file is opened, and kept up to date as it is
+                        edited. The first `:set spell` is then immediate
+                        too, at the price of the scanning being done whether
+                        or not 'spell' is ever set: >
+                            let g:typstprose_eager = 1
+<
+                                                         *hl-typstProseCode*
+typstProseCode          The highlight group of the grey. It links to
+                        |hl-Comment| unless the colorscheme says otherwise;
+                        `colors/custom.vim` links it to `customMuted`.
+
+The grey is a text property (|text-properties|), which replaces the syntax
+colour instead of mixing with it. |:SynCursor| lists it among the things
+that colour the character under the cursor.
+
+'spell' belongs to the window and the marks to the buffer. With one buffer
+in two windows, one with 'spell' and one without, the window entered last
+decides for both.
+
+Vim also remembers 'spell' for each buffer a window has shown: `:set
+nospell` typed in another buffer does not reach a Typst file that was left
+with it on, and that file is grey again when it is shown again.
+
+==============================================================================
+2. What counts as code                                       *typstprose-code*
+
+Grey:
+  - `#` and the expression after it, as far as Typst reads it: `#name`,
+    `#f(x)[y].z`, `#let x = 1 + 2` to the end of the line, `#if a {..} else
+    {..}` to the last block, `#show x: it => { ... }` over as many lines as
+    the block takes
+  - math, `$ ... $`
+  - raw text, between backticks
+  - `<labels>` and `@references`
+
+Not grey:
+  - the text of paragraphs, headings, list items and emphasis, with their
+    markers (`=`, `-`, `+`, `*`, `_`)
+  - the same inside a content block `[...]` in code: the caption in
+    `#figure(caption: [The potassium grid ...])` is prose, and only the
+    brackets around it are grey
+  - links written out as `https://...`
+  - comments, which keep their own colour
+
+==============================================================================
+3. Why not the syntax file                                    *typstprose-why*
+
+Greying the syntax groups of code was tried first and could not be made
+consistent. The bundled syntax finds code with regular expressions. On a
+922 line paper it took 1211 characters of prose for code, on 38 lines,
+nearly all of it the text of content blocks inside calls; and it missed the
+code on 6 lines, such as what follows the colon in >
+    #show figure.where(kind: "subfigure"): set figure(supplement: "Figure")
+<and the body of a `#show x: it => context {` that runs over several lines.
+
+So the code is found by a scanner of its own, which follows Typst's lexer
+and parser (typst-syntax 0.15) for the part that settles where code starts
+and stops. It was checked character by character against that parser on
+that paper, on a book of 14000 lines (166000 characters of code), on twenty
+package source files and on thirty documents of edge cases, valid and not,
+with no difference.
+
+Spell checking itself still goes by the syntax file. Where that takes code
+for prose, a word in it can be flagged, and shows as a spelling mark on
+grey. Strings in code are not spell checked (after/syntax/typst.vim): they
+are mostly file names, and "figures/potassium.png" would flag "png".
+
+==============================================================================
+4. Speed                                                    *typstprose-speed*
+
+Typing must not wait for this, so:
+
+  - Only what an edit may have changed is scanned again: from the last line
+    above it where a scan can start, to the first line below it where the
+    new scan and the old agree. A scan can start, and stop, at any line
+    that begins in running text or between the delimiters of a call, so for
+    a change in a paragraph, a caption or a table cell that is the line
+    itself, however long the block or the call around it.
+  - Scanning runs from a timer, a moment after a change, never while a key
+    is being handled, and in goes of at most 8 milliseconds or 250 lines,
+    between which Vim takes the keys typed meanwhile.
+  - What cannot be cut up (see |typstprose-limits|) is given up after a
+    time limit and tried again with twice the limit, but only once the
+    buffer has been left alone for six times as long.
+  - The marks are left alone while text that was typed is still waiting to
+    be drawn. Vim keeps one range of changed lines between two redraws and
+    parses the syntax of all of it again; a character typed at the end of a
+    long file and marks changed near its top, drawn together, cost a third
+    of a second there.
+
+Measured in the Windows console. On a 922 line paper, per change: 0.3 ms in
+a paragraph, 4 ms inside a sixty line call. On a 13826 line book, typing at
+its end while the first scan was still running: at 30 and at 120 ms a key,
+no key waited longer than without the plugin (33 and 147 ms against 33 and
+139). Only at 10 ms a key, faster than a held key repeats, did keys wait up
+to 0.1 second.
+
+Two things that would have been simpler are not done, because both lose
+typed keys when called from a timer in the Windows console: `getchar(1)`,
+to see whether a key is waiting, and `:redraw`.
+
+==============================================================================
+5. Limits                                                  *typstprose-limits*
+
+- A statement is scanned in one piece, as is an equation: the body of
+  `#let f(x) = { ... }`, of `#show x: it => { ... }`, the arguments of
+  `#set page(...)`. That is about 0.3 ms a line, each time something in it
+  changes: a hundred line function takes 30 ms, after a pause in the typing.
+- Typst counts open `[` afresh inside emphasis, headings and list items, so
+  a bracket opened in one and closed outside it pairs up differently there.
+  Here every `[` in a content block pairs with the next free `]`.
+- Non-ASCII letters count as identifier characters and the usual blocks of
+  non-ASCII punctuation do not. Typst uses Unicode's XID classes, which
+  differ for some symbols.
+- The scanner follows Typst 0.15. A later version that changes where an
+  expression ends needs the change made in autoload/typstprose.vim.
+- More than about forty levels of nesting are left as the syntax file
+  colours them.
+- The bundled syntax file synchronises from the start of the file, so the
+  first jump to the end of a 14000 line file takes Vim half a second, with
+  or without this plugin.
+
+ vim:tw=78:ts=8:ft=help:norl:
