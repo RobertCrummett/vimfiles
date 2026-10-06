@@ -164,6 +164,31 @@ augroup restart_editing_in_context
   au BufReadPost * if line("'\"") > 1 && line("'\"") <= line("$") | exe "normal! g'\"" | endif
 augroup END
 
+" The current directory follows the buffer the cursor is in: a file's own
+" directory, and in a diredit listing the directory it shows, so :Git, :grep
+" and :e work on what is on the screen. Not 'autochdir', which knows nothing
+" of a listing's diredit://{path} name. Buffers that are not a place on disk
+" (help, terminal, quickfix, fugitive://, no name) leave it as it is.
+" chdir() rather than :cd, so a window given its own directory with :lcd
+" keeps having its own.
+function! s:FollowBuffer() abort
+  if exists('b:diredit_dir')
+    let l:dir = b:diredit_dir
+  elseif &buftype !=# '' || empty(bufname('')) || bufname('') =~# '^\a\a\+://'
+    return
+  else
+    let l:dir = isdirectory(expand('%:p')) ? expand('%:p') : expand('%:p:h')
+  endif
+  if isdirectory(l:dir)
+    silent! call chdir(l:dir)
+  endif
+endfunction
+
+augroup cwd_follows_buffer
+  autocmd!
+  autocmd BufEnter,BufFilePost * call s:FollowBuffer()
+augroup END
+
 " NOTE Move lines in normal and visual mode.
 " Stole from https://github.com/amix/vimrc/blob/master/vimrcs/basic.vim
 " These overwrite CTRL-K, which is by default enter digraphs.
