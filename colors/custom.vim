@@ -24,14 +24,14 @@ function! s:Accents() abort
   hi customLightPink   guifg=#ffafd7 guibg=NONE gui=NONE ctermfg=218 ctermbg=NONE cterm=NONE
   hi customLightBlue   guifg=#5fafff guibg=NONE gui=NONE ctermfg=75  ctermbg=NONE cterm=NONE
 
-  " Typst code while 'spell' is on (plugin/typstprose.vim): the grey of
+  " Typst and LaTeX code while 'spell' is on (plugin/prose.vim): the grey of
   " comments without their bold, so that comments still stand out from it.
   if &background ==# 'dark'
     hi customMuted guifg=#707070 guibg=NONE gui=NONE ctermfg=242 ctermbg=NONE cterm=NONE
   else
     hi customMuted guifg=#626262 guibg=NONE gui=NONE ctermfg=241 ctermbg=NONE cterm=NONE
   endif
-  hi! link typstProseCode customMuted
+  hi! link proseCode customMuted
 
   " TODO markers stay as quiet as the comments they live in.
   hi! link Todo Comment
@@ -89,6 +89,37 @@ function! s:Accents() abort
   hi! link typstMarkupRawBlock       customLightPink
   hi! link typstMarkupRawDelim       customLightPink
   hi! link typstMarkupCodeBlockTypst customLightPink
+
+  " LaTeX, in Typst's colours (after/syntax/tex.vim reshapes the bundled
+  " rules to fit). Commands are lavender wherever they stand outside math:
+  " texStatement is any \name, texCmdName is \documentclass, \begin, \end and
+  " the \name that \newcommand defines, texSection is \section and its kin
+  " with \begin{document}, \title{ and \author{, texType is \textbf, \large
+  " and the other font commands. The name of an environment goes with its
+  " \begin. Braces, options, lengths and file names stay plain, like the
+  " arguments of a Typst function.
+  hi! link texStatement    customLavendar
+  hi! link texCmdName      customLavendar
+  hi! link texSection      customLavendar
+  hi! link texBeginEndName customLavendar
+  hi! link texNewCmd       customLavendar
+  hi! link texNewEnv       customLavendar
+  hi! link texDef          customLavendar
+  hi! link texType         customLavendar
+  " \label{..}, \ref{..}, \parencite[..]{..}: the whole of it is a reference,
+  " hot pink like <label> and @reference.
+  hi! link texRefZone      customPink
+  " Math is one colour all through, delimiters included: $...$, \[...\] and
+  " the equation environments from \begin{equation} to \end{equation}. Every
+  " zone links to texMath.
+  hi! link texMath         customLightPurple
+  " Verbatim text is raw text: \verb, \texttt{..}, \url{..}, the listings.
+  hi! link texZone         customLightPink
+  " \&, \%, \\ and --- are punctuation of the prose, and the accent of
+  " caf\'e is part of a word. Upstream has the first on SpecialChar, which
+  " here is the colour of math, and accents as commands.
+  hi! link texSpecialChar  Special
+  hi! link texAccent       Special
 
   " Vimscript: keywords are pink so they stand apart from function names,
   " which stay lavender like functions everywhere else. Ex commands (let,

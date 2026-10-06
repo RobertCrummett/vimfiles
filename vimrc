@@ -88,6 +88,12 @@ endif
 " plugins' K or :make and is never what is being written here.
 let g:filetype_m='matlab'
 
+" Every .tex file is LaTeX. Left to itself Vim takes one that does not start
+" a line with \documentclass, \usepackage or \begin for plain TeX: a chapter
+" in a file of its own, which then has neither the colours nor the spelling
+" mode of the main file.
+let g:tex_flavor='latex'
+
 " This disables netrw
 let g:loaded_netrw=1
 let g:loaded_netrwPlugin=1

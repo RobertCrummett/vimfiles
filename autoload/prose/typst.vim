@@ -1,8 +1,6 @@
-" typstprose: while 'spell' is on in a Typst window, draw everything that is
-" not prose in grey, so that only the text being proofread stands out.
-" See :help typstprose.
-
-" ---------------------------------------------------------------- scanner
+" prose, for Typst: which parts of a document are not prose. The marking of
+" buffers is in autoload/prose.vim, which calls prose#typst#run(). See :help
+" prose-typst.
 "
 " What is code is decided here and not by the syntax file. The bundled
 " syntax recognises code with regular expressions, which get it wrong in
@@ -32,6 +30,10 @@
 " The text is a list of lines, s:L, and the cursor a line index and a byte
 " offset in it, both from 0: one long string would be simpler, but every
 " index and match() on it costs Vim a pass over the whole string.
+
+" The last number given to a frame, and the most lines one go may cover.
+let s:serial = 0
+let s:span = 0
 
 let s:hi = '[^\x00-\x7f -¿×÷ -⁯←-⇿∀-⋿　-〿]'
 let s:id1 = '\%([A-Za-z_]\|' . s:hi . '\)'
@@ -97,7 +99,7 @@ function! s:Down() abort
   let s:line = get(s:L, s:ln, '')
   let s:ticks += 1
   if s:cap > 0 && s:ticks % 8 == 0 && reltimefloat(reltime(s:began)) > s:cap
-    throw 'typstprose-abort'
+    throw 'prose-abort'
   endif
 endfunction
 
@@ -105,7 +107,7 @@ endfunction
 " that runs on and on: a:l is the line it has come to.
 function! s:Long(l) abort
   if s:cap > 0 && a:l % 64 == 0 && reltimefloat(reltime(s:began)) > s:cap
-    throw 'typstprose-abort'
+    throw 'prose-abort'
   endif
 endfunction
 
@@ -493,7 +495,7 @@ function! s:Newline() abort
     let l:code = s:Code()
     if l:code
       let [s:into, s:intocode] = [s:frame, l:code]
-      throw 'typstprose-into'
+      throw 'prose-into'
     endif
   endif
   call s:Down()
@@ -1137,7 +1139,7 @@ function! s:Scan(lines, start, flag, safe, hi, blocks, budget, cap) abort
         else
           call s:Markup(l:frame, s:nest)
         endif
-      catch /^typstprose-into$/
+      catch /^prose-into$/
         let [l:frame, l:code] = [s:into, s:intocode]
         continue
       endtry
@@ -1157,7 +1159,7 @@ function! s:Scan(lines, start, flag, safe, hi, blocks, budget, cap) abort
     endif
     return {'items': s:out, 'end': s:end, 'endflag': s:endflag, 'arrive': s:arrive,
           \ 'more': s:more, 'stuck': 0, 'outer': l:outer}
-  catch /^typstprose-abort$/
+  catch /^prose-abort$/
     let [l:end, l:flag] = s:at
     while !empty(s:out) && s:out[-1][0] > l:end
       call remove(s:out, -1)
@@ -1175,346 +1177,15 @@ function! s:Scan(lines, start, flag, safe, hi, blocks, budget, cap) abort
   endtry
 endfunction
 
+" For autoload/prose.vim: a go at a buffer's lines. a:span is the most lines
+" it may cover.
+function! prose#typst#run(lines, start, flag, safe, hi, blocks, budget, cap, span) abort
+  let s:span = a:span
+  return s:Scan(a:lines, a:start, a:flag, a:safe, a:hi, a:blocks, a:budget, a:cap)
+endfunction
+
 " The code in a Typst document given as a list of lines; see "items" above.
-function! typstprose#scan(lines) abort
+function! prose#typst#scan(lines) abort
   return s:Scan(a:lines, 0, 1, [], len(a:lines), {}, 0, 0).items
 endfunction
 
-" ----------------------------------------------------------------- buffers
-"
-" The code is marked with text properties, which override the syntax colours
-" and move with the text as it is edited. What an edit may have changed is
-" scanned again from a timer, and only as far as needed: from the last line
-" before the edit that was arrived at, until the scan arrives, in the same
-" markup, at a line below the edit that the previous scan arrived at too.
-" For a change in a paragraph that is the line itself, also inside a content
-" block of any length; inside a long call, the call.
-"
-" s:bufs[bufnr] is the state of a buffer that has been marked:
-"   shown     1 while the marks are to be seen. With 'spell' off they stay
-"             on the text, without a colour, and are still told of changes:
-"             turning it on again then costs a scan of what changed, not of
-"             the file.
-"   safe      per line (from 0), the flag it was arrived at with, or 0
-"   blocks    s:blocks for the flags in safe
-"   dirty     1 when lines lo to hi (from 0) have changed since they were
-"             scanned; hi is below lo after a deletion
-"   lines     the text, kept from one go to the next while it has not changed
-"   timer     the pending timer, or 0
-"   listener  from listener_add()
-"   fresh     set by the listener: s:Run() uses it to see whether a change
-"             was still waiting to be told of
-"   cost      how long the last go took, in milliseconds
-"
-" Nothing here may make typing wait. A scan runs from a timer, so not while
-" keys are being handled, and in goes of s:slice: between two of them Vim
-" takes the keys typed meanwhile. Only code that spans many lines, such as a
-" call left open at the top of a long file, cannot be cut up. A go is
-" therefore given up after twice what the last one took (and never less than
-" s:least), and tried again with twice as long, but only once the buffer has
-" been left alone for several times that: s:Later() waits six times the
-" cost of the last go, starting over at every change when that is long.
-
-let s:type = 'typstProseCode'
-let s:bufs = {}
-let s:serial = 0
-let s:slice = 0.008
-let s:least = 0.015
-" The most lines one go may cover. Vim keeps one range of changed lines per
-" buffer between two redraws, and when it draws a window below that range it
-" parses the syntax of all of it again: measured at the end of a 14000 line
-" file, marks changed at line 3900 cost 1 ms to redraw, a character typed at
-" line 13780 0.3 ms, and both in one redraw 350 ms. So a go stays within
-" this many lines, and s:Run() leaves the marks alone while text that was
-" typed is still to be drawn. (It cannot have it drawn itself: ":redraw"
-" from a timer loses typed keys in the Windows console, as getchar(1) does.)
-let s:span = 250
-" Above this cost, in milliseconds, wait for a pause in the typing.
-let s:heavy = 12.0
-
-function! s:Reset(buf) abort
-  let l:st = s:bufs[a:buf]
-  let l:n = getbufinfo(a:buf)[0].linecount
-  let l:st.safe = [1] + repeat([0], l:n - 1)
-  let l:st.blocks = {}
-  let l:st.keep = 4000
-  let [l:st.dirty, l:st.lo, l:st.hi] = [1, 0, l:n - 1]
-  call prop_remove({'type': s:type, 'bufnr': a:buf, 'all': v:true})
-endfunction
-
-function! s:Schedule(buf, ms) abort
-  let l:st = s:bufs[a:buf]
-  if !l:st.timer && (l:st.shown || get(g:, 'typstprose_eager', 0))
-    let l:st.timer = timer_start(a:ms, function('s:Run', [a:buf]))
-  endif
-endfunction
-
-" Scan a while after the last change: at once when that is cheap, and when
-" it is not, only after the typing has paused for six times what it costs.
-function! s:Later(buf) abort
-  let l:st = s:bufs[a:buf]
-  if l:st.cost > s:heavy
-    call timer_stop(l:st.timer)
-    let l:st.timer = 0
-  endif
-  call s:Schedule(a:buf, float2nr(min([max([30.0, 6 * l:st.cost]), 3000.0])))
-endfunction
-
-" The listener. a:changes are the changes one by one, in the order they were
-" made, each with the line numbers of its own time. (a:start, a:end and
-" a:added sum them up, but a:end is the largest end of any of them, which
-" for a change below one that added or removed lines is a line number of a
-" later time than a:start: taken as one block, an undo that deleted lines
-" in one place and changed a line further down came out short.)
-function! s:Changed(buf, start, end, added, changes) abort
-  let l:st = get(s:bufs, a:buf, {})
-  if empty(l:st)
-    return
-  endif
-  let l:st.fresh = 1
-  for l:c in a:changes
-    if !s:Change(l:st, l:c.lnum, l:c.end, l:c.added)
-      " Not what we have been told so far: start over.
-      call s:Reset(a:buf)
-      call s:Schedule(a:buf, 30)
-      return
-    endif
-  endfor
-  call s:Later(a:buf)
-endfunction
-
-" Lines a:start to a:end - 1 (from 1) were replaced by a:added more, or
-" fewer, lines. Keeps "safe" in step with the buffer and widens the dirty
-" range. A line is arrived at the same way however its own text changes, so
-" the first changed line keeps its flag; the lines after it are unknown.
-" Returns 0 when the change does not fit the buffer as it was known.
-function! s:Change(st, start, end, added) abort
-  let l:st = a:st
-  let l:first = a:start - 1
-  let l:old = a:end - a:start
-  let l:new = l:old + a:added
-  if l:first > len(l:st.safe) || l:first + l:old > len(l:st.safe) || l:new < 0
-    return 0
-  endif
-  let l:keep = get(l:st.safe, l:first, 0)
-  if l:old > 0
-    call remove(l:st.safe, l:first, l:first + l:old - 1)
-  endif
-  if l:new > 0
-    call extend(l:st.safe, [l:keep] + repeat([0], l:new - 1), l:first)
-  elseif l:first < len(l:st.safe)
-    " Only deleted: the line that moved up is now reached as the first of
-    " the deleted lines was.
-    let l:st.safe[l:first] = l:keep
-  endif
-  let l:last = l:first + max([l:new, 1]) - 1
-  if l:st.dirty
-    if l:st.lo >= l:first + l:old
-      let l:st.lo += a:added
-    endif
-    if l:st.hi >= l:first + l:old
-      let l:st.hi += a:added
-    endif
-    let l:st.lo = min([l:st.lo, l:first])
-    let l:st.hi = max([l:st.hi, l:last])
-  else
-    let [l:st.dirty, l:st.lo, l:st.hi] = [1, l:first, l:last]
-  endif
-  return 1
-endfunction
-
-" Forget the blocks that no flag refers to any more, nor any block one of
-" those is in.
-function! s:Prune(st) abort
-  let l:used = {}
-  for l:flag in a:st.safe
-    let l:id = l:flag / 1000
-    while l:id && !has_key(l:used, l:id) && has_key(a:st.blocks, l:id)
-      let l:used[l:id] = a:st.blocks[l:id]
-      let l:id = l:used[l:id][0]
-    endwhile
-  endfor
-  let a:st.blocks = l:used
-  let a:st.keep = 2 * len(l:used) + 4000
-endfunction
-
-function! s:Run(buf, timer) abort
-  let l:st = get(s:bufs, a:buf, {})
-  if empty(l:st)
-    return
-  endif
-  let l:st.timer = 0
-  if !bufloaded(a:buf)
-    call s:Drop(a:buf)
-    return
-  endif
-  let l:st.fresh = 0
-  call listener_flush(a:buf)
-  if !l:st.dirty
-    return
-  elseif a:timer && l:st.fresh
-    " Text has changed that Vim has not drawn yet, or it would have told of
-    " the change before. Marks changed now would be drawn with it; see s:span.
-    call s:Schedule(a:buf, 40)
-    return
-  endif
-  let l:began = reltime()
-  let l:tick = getbufvar(a:buf, 'changedtick')
-  if l:st.tick != l:tick
-    let l:st.lines = getbufline(a:buf, 1, '$')
-    let l:st.tick = l:tick
-  endif
-  let l:n = len(l:st.lines)
-  if len(l:st.safe) != l:n
-    call s:Reset(a:buf)
-  endif
-  let l:st.safe[0] = 1
-  let l:start = min([l:st.lo, l:n - 1])
-  while !l:st.safe[l:start] || (l:st.safe[l:start] >= 1000 && !has_key(l:st.blocks, l:st.safe[l:start] / 1000))
-    let l:start -= 1
-  endwhile
-  " From typstprose#flush() (no timer) the scan takes as long as it takes.
-  let l:cap = a:timer == 0 ? 0 : max([s:least, 0.002 * l:st.cost])
-  while 1
-    let l:r = s:Scan(l:st.lines, l:start, l:st.safe[l:start], l:st.safe, l:st.hi, l:st.blocks, s:slice, l:cap)
-    if l:r.outer < 0
-      break
-    endif
-    " The block the scan started in ended before the scan met the old one.
-    " Start again from the nearest line above that the markup this block is
-    " in arrived at.
-    let l:start -= 1
-    while l:start > 0 && (!l:st.safe[l:start] || l:st.safe[l:start] / 1000 != l:r.outer)
-      let l:start -= 1
-    endwhile
-  endwhile
-  if l:r.end > l:start
-    call prop_remove({'type': s:type, 'bufnr': a:buf, 'all': v:true}, l:start + 1, l:r.end)
-    if !empty(l:r.items)
-      call prop_add_list({'type': s:type, 'bufnr': a:buf}, l:r.items)
-    endif
-    let l:st.safe[l:start : l:r.end - 1] = repeat([0], l:r.end - l:start)
-    for [l:l, l:flag] in l:r.arrive
-      let l:st.safe[l:l] = l:flag
-    endfor
-  endif
-  let l:st.cost = reltimefloat(reltime(l:began)) * 1000
-  if !l:r.more
-    let l:st.dirty = 0
-    let [l:st.lines, l:st.tick] = [[], -1]
-    if len(l:st.blocks) > l:st.keep
-      call s:Prune(l:st)
-    endif
-    return
-  endif
-  " Not done: carry on from the line it stopped at.
-  let l:st.safe[l:r.end] = l:r.endflag
-  let l:st.lo = l:r.end
-  if l:r.stuck
-    " What starts there needs longer than it was given. Remember that as the
-    " cost, which doubles the time it gets and lengthens the wait before it.
-    let l:st.cost = 1000 * l:cap
-    call s:Later(a:buf)
-  else
-    call s:Schedule(a:buf, 1)
-  endif
-endfunction
-
-" Whether the marks of a buffer are to be seen. The type of the property is
-" the buffer's own, so this is one change, whatever the number of marks: a
-" highlight that replaces the syntax colour, or one that sets nothing and
-" is added to it.
-function! s:Show(buf, on) abort
-  let s:bufs[a:buf].shown = a:on
-  if !hlexists('typstProseOff')
-    highlight typstProseOff NONE
-  endif
-  let l:how = a:on ? {'highlight': 'typstProseCode', 'combine': v:false} : {'highlight': 'typstProseOff', 'combine': v:true}
-  call prop_type_change(s:type, extend(l:how, {'bufnr': a:buf}))
-  if s:bufs[a:buf].dirty
-    call s:Schedule(a:buf, 0)
-  endif
-endfunction
-
-function! s:Start(buf, shown) abort
-  if empty(prop_type_get(s:type, {'bufnr': a:buf}))
-    call prop_type_add(s:type, {'bufnr': a:buf, 'highlight': 'typstProseCode', 'combine': v:false})
-  endif
-  let s:bufs[a:buf] = {'timer': 0, 'cost': 0.0, 'shown': 0, 'lines': [], 'tick': -1, 'fresh': 0}
-  let s:bufs[a:buf].listener = listener_add(function('s:Changed'), a:buf)
-  " For the plugin's autocommands: this buffer is ours to unmark, whatever
-  " becomes of its filetype.
-  call setbufvar(a:buf, 'typstprose', 1)
-  call s:Reset(a:buf)
-  augroup typstprose_buffers
-    execute 'autocmd! * <buffer=' . a:buf . '>'
-    " Reloaded (:edit!, or changed on disk): the text is new, the listener
-    " was told nothing.
-    execute 'autocmd BufReadPost <buffer=' . a:buf . '> call s:Reload(' . a:buf . ')'
-    execute 'autocmd BufUnload <buffer=' . a:buf . '> call s:Drop(' . a:buf . ')'
-  augroup END
-  call s:Show(a:buf, a:shown)
-endfunction
-
-function! s:Reload(buf) abort
-  if has_key(s:bufs, a:buf)
-    call s:Reset(a:buf)
-    call s:Schedule(a:buf, 0)
-  endif
-endfunction
-
-" Stop following a buffer; its marks, if it still has any, stay.
-function! s:Drop(buf) abort
-  let l:st = remove(s:bufs, a:buf)
-  call timer_stop(l:st.timer)
-  call listener_remove(l:st.listener)
-  call setbufvar(a:buf, 'typstprose', 0)
-  augroup typstprose_buffers
-    execute 'autocmd! * <buffer=' . a:buf . '>'
-  augroup END
-endfunction
-
-function! s:Stop(buf) abort
-  call s:Drop(a:buf)
-  call prop_remove({'type': s:type, 'bufnr': a:buf, 'all': v:true})
-  call prop_type_delete(s:type, {'bufnr': a:buf})
-endfunction
-
-" Show or hide the marks of the current buffer to suit the current window:
-" shown while the window has 'spell' set and the buffer is Typst. 'spell'
-" belongs to the window and the marks to the buffer, so with two windows on
-" one buffer the one that was entered last decides.
-function! typstprose#sync() abort
-  let l:buf = bufnr()
-  let l:known = has_key(s:bufs, l:buf)
-  if &filetype !=# 'typst' || !get(g:, 'typstprose', 1)
-    if l:known
-      call s:Stop(l:buf)
-    endif
-  elseif !l:known
-    " With g:typstprose_eager the marks are made, unseen, as soon as there is
-    " a Typst buffer, so that they are there when 'spell' is first set.
-    if &l:spell || get(g:, 'typstprose_eager', 0)
-      call s:Start(l:buf, &l:spell)
-    endif
-  elseif s:bufs[l:buf].shown != &l:spell
-    call s:Show(l:buf, &l:spell)
-  endif
-endfunction
-
-" For tests: the state of a buffer that has been marked, {} for any other.
-function! typstprose#status(...) abort
-  let l:st = get(s:bufs, a:0 ? a:1 : bufnr(), {})
-  return empty(l:st) ? {} : {'shown': l:st.shown, 'dirty': l:st.dirty, 'cost': l:st.cost,
-        \ 'safe': copy(l:st.safe), 'blocks': len(l:st.blocks)}
-endfunction
-
-" Bring the marks of a buffer up to date now, without waiting for the timer.
-function! typstprose#flush(...) abort
-  let l:buf = a:0 ? a:1 : bufnr()
-  call listener_flush(l:buf)
-  while has_key(s:bufs, l:buf) && s:bufs[l:buf].dirty
-    call timer_stop(s:bufs[l:buf].timer)
-    call s:Run(l:buf, 0)
-  endwhile
-endfunction

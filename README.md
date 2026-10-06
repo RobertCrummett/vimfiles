@@ -30,12 +30,21 @@ Because I always come back to this editor, I might as well study the language of
   the way it is, in searchable buffers, with the file and line each rule or
   link came from and whether it is yours to edit. `:SynCursor` also lists
   the text properties and the spelling mark drawn over the syntax colour.
-- **plugin/typstprose.vim** — with `:set spell` in a Typst buffer, everything
-  that is not prose turns one grey (comments keep their bold), and
-  `:set nospell` brings the colours back. Code is found by a scanner that
-  follows Typst's own parser rather than the syntax file, so the caption text
-  inside `#figure(caption: [...])` stays prose; it rescans only around an
-  edit, from a timer. See `:help typstprose`.
+- **plugin/prose.vim** — with `:set spell` in a Typst or LaTeX buffer,
+  everything that is not prose turns one grey (comments keep their bold), and
+  `:set nospell` brings the colours back. Code is found by a scanner for each
+  language rather than by the syntax file: for Typst one that follows Typst's
+  own parser, so the caption text inside `#figure(caption: [...])` stays
+  prose; for LaTeX one that goes by a table of commands, so `\ref{fig:1}`,
+  `\includegraphics[width=3cm]{plot.pdf}` and all math are grey and the text
+  of a caption is not. It rescans only around an edit, from a timer. See
+  `:help prose`.
+- **after/syntax/tex.vim** — LaTeX in the colours of Typst: commands
+  lavender, references and citations hot pink (`\parencite`, `\cref` and any
+  command with "cite" in its name or "ref" at its end), math one colour from
+  `$` to `$` and from `\begin{equation}` to `\end{equation}`, verbatim text
+  light pink, section titles bold and underlined. Spelling is checked in the
+  prose only, from the same table of commands as the plugin above.
 - **after/ftplugin/markdown.vim**, **after/syntax/markdown.vim**,
   **autoload/markdown.vim** — `$...$` and `$$...$$` are math, so the `_` in
   `$F_a$` is no longer an error and is coloured like Typst math; `gq` over a
@@ -98,7 +107,7 @@ so nothing takes the focus from Vim.
 Every local plugin has a Vim help file under `doc/`: `:help comments`,
 `:help diredit`, `:help geospell`, `:help llm`, `:help matlabdoc`,
 `:help matlabserver`, `:help matlabdebug`, `:help markdown-local`,
-`:help synexplore`, `:help tagsgen`, `:help typstprose`,
+`:help synexplore`, `:help tagsgen`, `:help prose`,
 `:help thesaurus.vim`, `:help sexptutor`, and any command by name, for
 example `:help :SynCursor` or `:help :MakeTags`. The vimrc rebuilds
 `doc/tags` at startup, so edits to the help files show up on the next
