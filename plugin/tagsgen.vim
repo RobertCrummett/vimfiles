@@ -30,7 +30,7 @@ let s:filetypes = {
   \ 'lua': 'lua', 'vim': 'vim', 'sh': 'sh', 'bash': 'sh', 'ps1': 'ps1',
   \ 'bat': 'dosbatch', 'cmd': 'dosbatch', 'm': 'matlab',
   \ 'scm': 'scheme', 'ss': 'scheme', 'rkt': 'racket', 'lisp': 'lisp', 'lsp': 'lisp', 'el': 'lisp',
-  \ 'typ': 'typst', 'tex': 'tex', 'sty': 'tex', 'md': 'markdown',
+  \ 'typ': 'typst', 'tex': 'tex', 'sty': 'tex', 'md': 'markdown', 'lean': 'lean',
   \ }
 let g:tagsgen_filetypes = extend(s:filetypes, get(g:, 'tagsgen_filetypes', {}))
 
@@ -150,6 +150,15 @@ let s:patterns.typst = [
   \ ['^\s*#let\s\+\zs[A-Za-z_][A-Za-z0-9_-]*\ze\s*(', 'f'],
   \ ['^\s*#let\s\+\zs[A-Za-z_][A-Za-z0-9_-]*\ze\s*=', 'v'],
   \ ['<\zs[A-Za-z0-9_.:-]\+\ze>', 'l'],
+  \ ]
+" Lean: the tag is the last component of the name, add_comm for
+" "theorem Nat.add_comm", since that is the word CTRL-] picks up under the
+" cursor. An instance without a name gives no tag.
+let s:lean_mods = '\%(@\[[^\]]*\]\s*\)*\%(\%(private\|protected\|public\|noncomputable\|partial\|unsafe\|nonrec\|meta\)\s\+\)*'
+let s:lean_name = '\%([^[:space:](){}\[\]:,;]*\.\)\?\zs\%(«[^»]*»\|[^.[:space:](){}\[\]:,;]\+\)'
+let s:patterns.lean = [
+  \ ['^\s*' . s:lean_mods . '\%(def\|theorem\|lemma\|abbrev\|axiom\|opaque\|instance\)\s\+' . s:lean_name, 'f'],
+  \ ['^\s*' . s:lean_mods . '\%(structure\|inductive\|class\%(\s\+inductive\)\?\)\s\+' . s:lean_name, 's'],
   \ ]
 let s:patterns.tex = [
   \ ['\\label{\zs[^}]\+\ze}', 'l'],

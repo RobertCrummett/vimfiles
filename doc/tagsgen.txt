@@ -79,6 +79,9 @@ a autocommand group, h heading.
   Lisp            defun/defmacro/defgeneric/defmethod, defvar/defparameter,
                   defstruct/defclass
   Typst           #let functions and values, <labels>
+  Lean            def, theorem, lemma, abbrev, axiom, opaque, instance,
+                  structure, inductive, class (the last component of
+                  a dotted name)
   TeX             \label, \newcommand, \newenvironment
   Markdown        headings
 

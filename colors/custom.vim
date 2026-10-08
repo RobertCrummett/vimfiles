@@ -251,6 +251,20 @@ function! s:Accents() abort
   " colour of labels and jumps rather than that of the other keywords.
   hi! link matlabScope            customPink
 
+  " Lean (syntax/lean.vim), in Rust's colours. The name a def, theorem or
+  " structure introduces is lavender. Text literals are light pink; escapes,
+  " the braces of s!"{x}", @[attributes] and the # of #eval and #check are
+  " notation, light purple. sorry is hot pink: where Lean stops checking.
+  " Keywords, sorts and numbers stay plain.
+  hi! link leanDeclarationName    customLavendar
+  hi! link leanString             customLightPink
+  hi! link leanChar               customLightPink
+  hi! link leanEscape             customLightPurple
+  hi! link leanInterpolationDelim customLightPurple
+  hi! link leanAttribute          customLightPurple
+  hi! link leanHashCommand        customLightPurple
+  hi! link leanSorry              customPink
+
   " Lisp
   hi! link lispFunc customLavendar
   hi! link lispKey  customLightPurple

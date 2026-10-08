@@ -45,6 +45,12 @@ Because I always come back to this editor, I might as well study the language of
   `$` to `$` and from `\begin{equation}` to `\end{equation}`, verbatim text
   light pink, section titles bold and underlined. Spelling is checked in the
   prose only, from the same table of commands as the plugin above.
+- **ftplugin/lean.vim**, **compiler/lean.vim**, **syntax/lean.vim** — Lean 4.
+  `:make` checks the file, through `lake lean` inside a Lake project and
+  plain `lean` outside one, and errors and warnings land in the quickfix
+  list on the right character. In Insert mode `\to` types →, `\all` ∀,
+  `\<` ⟨, `\a` α and so on (`:LeanSymbols` lists them). Highlighting is
+  small on purpose. See `:help lean-local`.
 - **after/ftplugin/markdown.vim**, **after/syntax/markdown.vim**,
   **autoload/markdown.vim** — `$...$` and `$$...$$` are math, so the `_` in
   `$F_a$` is no longer an error and is coloured like Typst math; `gq` over a
@@ -107,7 +113,7 @@ so nothing takes the focus from Vim.
 Every local plugin has a Vim help file under `doc/`: `:help comments`,
 `:help diredit`, `:help geospell`, `:help llm`, `:help matlabdoc`,
 `:help matlabserver`, `:help matlabdebug`, `:help markdown-local`,
-`:help synexplore`, `:help tagsgen`, `:help prose`,
+`:help lean-local`, `:help synexplore`, `:help tagsgen`, `:help prose`,
 `:help thesaurus.vim`, `:help sexptutor`, and any command by name, for
 example `:help :SynCursor` or `:help :MakeTags`. The vimrc rebuilds
 `doc/tags` at startup, so edits to the help files show up on the next

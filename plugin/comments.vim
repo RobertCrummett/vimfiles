@@ -21,7 +21,7 @@ let s:leaders['#'] = ['python', 'pyrex', 'sh', 'bash', 'zsh', 'csh', 'tcsh', 'fi
   \ 'graphql', 'gnuplot', 'desktop', 'readline', 'dircolors', 'crontab', 'fstab', 'sudoers',
   \ 'requirements', 'just', 'snakemake', 'muttrc', 'pkgbuild', 'debsources']
 let s:leaders['--'] = ['lua', 'haskell', 'sql', 'plsql', 'mysql', 'ada', 'vhdl', 'elm', 'purescript',
-  \ 'agda', 'idris', 'eiffel', 'applescript']
+  \ 'agda', 'idris', 'lean', 'eiffel', 'applescript']
 let s:leaders['%'] = ['matlab', 'octave', 'tex', 'plaintex', 'bibtex', 'context', 'erlang', 'prolog',
   \ 'postscript']
 let s:leaders[';;'] = ['racket', 'scheme', 'lisp', 'clojure', 'fennel']

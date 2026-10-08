@@ -30,6 +30,14 @@ Editing a directory path directly, as in `:e .` or starting Vim with a
 directory argument, also opens a listing. The buffer is named
 `diredit://{path}`, so `:e diredit://C:/some/dir` works too.
 
+                                                                 *diredit-cwd*
+The current directory follows the listing: entering one, or moving to
+another with `<CR>` or `-`, makes the directory shown Vim's current
+directory, and going back to a file makes it that file's directory. So
+`:Git` from a listing answers for the repository being looked at. This is
+done by the `cwd_follows_buffer` autocommand in the vimrc, which reads
+`b:diredit_dir`.
+
                                                            *diredit-alternate*
 A listing is a way to a file, not a place to go back to. It is unlisted, so
 `:bnext` passes it by, and it never stays the alternate file: from file A

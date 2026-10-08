@@ -1,0 +1,102 @@
+*lean.txt*   Lean 4: :make, symbols and colours                  *lean-plugin*
+
+                                                  *lean-local* *plugin-lean*
+Vim detects *.lean files and has nothing else for them. This is the rest,
+for Lean 4: ftplugin/lean.vim, compiler/lean.vim, syntax/lean.vim,
+autoload/lean.vim and plugin/lean.vim. There is no language server here, so
+no goal view: Lean is asked about a file with |:make|.
+
+1. :make                                        |lean-make|
+2. Symbols                                      |lean-symbols|
+3. Colours                                      |lean-syntax|
+4. The rest of the filetype plugin              |lean-ftplugin|
+5. Options                                      |lean-options|
+
+==============================================================================
+1. :make                                                          *lean-make*
+
+|:make| checks the file being edited and puts Lean's errors and warnings in
+the quickfix list. Write the file first: Lean reads it from disk.
+
+A file on its own is checked with >
+    lean "file.lean"
+A file in a Lake project, one with a lakefile.lean or lakefile.toml in a
+directory above it, is checked with >
+    lake -d "project root" lean "file.lean"
+which builds the file's imports first, so the first :make in a project that
+uses Mathlib takes as long as that build does. Which of the two a buffer
+uses is decided when it is opened; `:compiler lean` decides again.
+
+An entry is the first line of a message: >
+    Foo.lean|3 col 24 error| unsolved goals
+    || ⊢ False
+The lines under it, the goal, a hint or a note, are kept as they came, so
+|:copen| shows a goal state laid out as Lean printed it, and |:cnext| steps
+over them from one message to the next. The output of #eval and #check has
+no position and is listed the same way.
+
+Two things are put right after the list is read (lean#quickfix(), from a
+|QuickFixCmdPost| autocommand). Lean counts columns from 0 and in characters,
+Vim from 1 and in bytes, so the cursor lands on the right character of a line
+with α and → before it. And when an import fails to build, Lake names that
+file by its path from the project root, which is not the current directory;
+the entry is pointed at the real file.
+
+==============================================================================
+2. Symbols                                                     *lean-symbols*
+
+In Insert mode a backslash and a name give a symbol, by the names Lean's own
+editor support uses: >
+
+    \to  →     \all  ∀     \and  ∧     \le  ≤     \<  ⟨     \a  α
+    \l   ←     \ex   ∃     \or   ∨     \ge  ≥     \>  ⟩     \b  β
+    \iff ↔     \fun  λ     \not  ¬     \ne  ≠     \.  ·     \N  ℕ
+    \mapsto ↦  \|-   ⊢     \in   ∈     \times ×   \tr ▸     \1  ₁
+<
+							      *:LeanSymbols*
+:LeanSymbols		List every name, by symbol, in a scratch window.
+
+These are ordinary |:inoremap| mappings, local to the buffer. Where one name
+begins another (\l and \le, \to and \top) Vim waits for the next key to tell
+them apart, which in practice is the space or bracket typed anyway. No name
+is a string escape, so "a\n" types as written, which is why × is \times and
+↑ is \up. A backslash that must not start a symbol is typed |i_CTRL-V| \.
+
+==============================================================================
+3. Colours                                                      *lean-syntax*
+
+syntax/lean.vim is deliberately small. It knows comments (nested, and doc
+comments), strings, characters and numbers, the keywords of commands and
+terms, the name after def, theorem, structure and the like, @[attributes],
+and the # commands. It does not know tactics or library names.
+
+In colors/custom.vim the declared name is lavender; strings and characters
+light pink; escapes, the braces of s!"{x}", attributes and #eval light
+purple; `sorry` hot pink. Keywords, sorts and numbers stay plain.
+
+==============================================================================
+4. The rest of the filetype plugin                            *lean-ftplugin*
+
+'commentstring' and 'comments' for -- and /- -/, so |gq| formats comments
+and gc (|comments|) toggles them. Two spaces of indent. ' is a keyword
+character, so h' is one word to |star| and |w|. |%| matches ⟨ ⟩ and ⟦ ⟧.
+|gf| on the Foo.Bar of an import opens Foo/Bar.lean under the project root.
+|:MakeTags| knows Lean declarations (|tagsgen-languages|).
+
+==============================================================================
+5. Options                                                     *lean-options*
+
+Set these in the vimrc.
+
+							*g:lean_symbol_maps*
+g:lean_symbol_maps	0 to leave the symbol mappings out. Default 1.
+
+						      *g:lean_symbol_leader*
+g:lean_symbol_leader	What starts a symbol name. Default "\".
+
+							     *g:lean_symbols*
+g:lean_symbols		A dictionary of names to add or change. An empty
+			symbol removes a name: >
+    let g:lean_symbols = {'qed': '∎', 'o': ''}
+<
+ vim:tw=78:ts=8:noet:ft=help:norl:
