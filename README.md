@@ -53,8 +53,11 @@ Because I always come back to this editor, I might as well study the language of
   `:make` checks the file, through `lake lean` inside a Lake project and
   plain `lean` outside one, and errors and warnings land in the quickfix
   list on the right character. In Insert mode `\to` types →, `\all` ∀,
-  `\<` ⟨, `\a` α and so on (`:LeanSymbols` lists them). Highlighting is
-  small on purpose. See `:help lean-local`.
+  `\<` ⟨, `\a` α and so on (`:LeanSymbols` lists them). Declared names and
+  tactics are lavender; quantifiers, connectives, arrows, `⟨ ⟩`, the focus
+  dot, `<;>`, attributes and `#check` light purple; strings light pink; and
+  hot pink only where Lean stops checking: `sorry`, `admit`, `axiom`,
+  `native_decide`, `unsafe`, `partial`. See `:help lean-local`.
 - **after/ftplugin/markdown.vim**, **after/syntax/markdown.vim**,
   **autoload/markdown.vim** — `$...$` and `$$...$$` are math, so the `_` in
   `$F_a$` is no longer an error and is coloured like Typst math; `gq` over a
