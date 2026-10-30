@@ -39,6 +39,10 @@ Because I always come back to this editor, I might as well study the language of
   `\includegraphics[width=3cm]{plot.pdf}` and all math are grey and the text
   of a caption is not. It rescans only around an edit, from a timer. See
   `:help prose`.
+- **plugin/bgmake.vim** — `:make` in a LaTeX buffer runs latexmk as a job, so
+  editing goes on during a build, however `:make` was reached. The quickfix
+  list is filled when it ends, with the errors that have no file or line too,
+  and `:clist` lists them. See `:help bgmake`.
 - **after/syntax/tex.vim** — LaTeX in the colours of Typst: commands
   lavender, references and citations hot pink (`\parencite`, `\cref` and any
   command with "cite" in its name or "ref" at its end), math one colour from

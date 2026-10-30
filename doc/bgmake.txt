@@ -1,0 +1,87 @@
+*bgmake.txt*    :make in the background                          *bgmake-plugin*
+
+                                                    *bgmake* *plugin-bgmake*
+Runs |:make| as a job, so that editing goes on while it builds, and fills the
+quickfix list when it ends. Lives in plugin/bgmake.vim and autoload/bgmake.vim.
+
+1. Use                                          |bgmake-use|
+2. Errors                                       |bgmake-errors|
+3. Options                                      |bgmake-options|
+4. Limits                                       |bgmake-limits|
+
+==============================================================================
+1. Use                                                            *bgmake-use*
+
+In a buffer whose filetype is in |g:bgmake_filetypes|, |:make| writes the
+buffer if it is modified, returns at once, and runs 'makeprg' as a job, in the
+current directory and through 'shell', as |:make| itself does. Every |:make|
+goes this way, typed or from a mapping or a script. In any other buffer |:make|
+is the ordinary one.
+
+When the build ends the last line says how it went: >
+
+    make done (1.4 s)
+    make: 2 errors (3.7 s), :clist to see them
+    make failed (0.4 s), :clist for its output
+
+Nothing jumps and no window opens, because the cursor may be anywhere by then.
+The errors are read with the 'errorformat' of the buffer that started the
+build, and from the directory it ran in, so changing buffer or directory during
+a build does no harm.
+
+A |:make| during a build does not stop it, because killing a build can leave
+half-written files behind. One more build follows the running one, however
+many times |:make| was given.
+
+                                                            *bgmake#running()*
+bgmake#running()        True while a build runs, for 'statusline'.
+
+==============================================================================
+2. Errors                                                      *bgmake-errors*
+
+|:clist| lists the errors and |:cc| goes to them. For LaTeX, the 'errorformat'
+in compiler/latexmk.vim picks these out of the output of latexmk:
+
+    file:line: message    TeX's errors, with -file-line-error
+    ! message             TeX's errors that have no file or line, such as a
+                          missing package or a brace left open at the end of
+                          the file; a file with no \end{document} gives only
+                          "! Emergency stop."
+    ERROR - message       errors from biber
+    ... previous invocation of latexmk.
+                          a second |:make| with nothing changed, which runs no
+                          TeX and so has no error to repeat
+
+"==> Fatal error occurred" is left out, since it follows every fatal error and
+says nothing about it.
+
+An error with no file is put on the buffer that was built, so that |:clist|
+shows it, which it would not for an entry with no file, and |:cc| goes to that
+buffer. This holds when 'errorformat' ends in %-G%.%#, which says that every
+line left is an error. An ordinary |:make| hides these entries, and |:clist!|
+shows them.
+
+A build that fails in a way 'errorformat' does not know lists the last twelve
+lines of its output instead, so a failure is never silent.
+
+Warnings are not listed: an undefined citation is not an error to latexmk.
+
+==============================================================================
+3. Options                                                    *bgmake-options*
+
+*g:bgmake_filetypes*    The filetypes whose |:make| runs in the background.
+                        Default ['tex']. An empty list keeps every |:make|
+                        ordinary. Set it in the vimrc, or at any time.
+
+==============================================================================
+4. Limits                                                      *bgmake-limits*
+
+|:make| is stopped by |interrupt()| from a |QuickFixCmdPre| autocommand, which
+works like CTRL-C. So:
+
+- What follows the |:make| is dropped: the rest of "make | cwindow", the rest
+  of a function, and keys still queued in a mapping.
+- The autocommand cannot see arguments or the !, so ":make foo" builds as
+  |:make| does.
+
+ vim:tw=78:ts=8:noet:ft=help:norl:
