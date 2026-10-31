@@ -22,3 +22,15 @@ qwen2.5-coder-7b-q4   QuantFactory/Qwen2.5-Coder-7B-GGUF      Qwen2.5-Coder-7B.Q
 qwen2.5-coder-14b-q4  bartowski/Qwen2.5-Coder-14B-GGUF        Qwen2.5-Coder-14B-Q4_K_M.gguf  yes  9.0 GB. Best domain knowledge: 7/8 geophysics facts against 2/8 for the 7B. Needs 12 GB or more.
 qwen2.5-coder-14b     ggml-org/Qwen2.5-Coder-14B-Q8_0-GGUF    qwen2.5-coder-14b-q8_0.gguf    yes  16 GB. Does not fit a 16 GB card once context is added; use the -q4 row instead.
 qwen3-4b              ggml-org/Qwen3-4B-GGUF                  Qwen3-4B-Q8_0.gguf              no   4.3 GB. General model for prose; no fill-in-the-middle, so the text after the cursor is ignored. Tested worse than the coders even on prose.
+#
+# Mistral, fetched 2026-10-12. None has fill-in-the-middle and none has been
+# measured here. The -base rows continue text, which is what a completion
+# sends; the others are instruction models, kept for a chat request (grammar
+# checking) and a poor fit for completion. On the AMD machine the weights are
+# in Documents\models (g:llm_model_dirs in after/plugin/local.vim).
+ministral-3b-base     mradermacher/Ministral-3-3B-Base-2512-GGUF          Ministral-3-3B-Base-2512.Q8_0.gguf                no   3.4 GB. Base model: prose continuation, prefix only. Not measured.
+ministral-8b-base     mradermacher/Ministral-3-8B-Base-2512-GGUF          Ministral-3-8B-Base-2512.Q4_K_M.gguf              no   4.8 GB. Base model: prose continuation, prefix only. Not measured.
+ministral-3b          mistralai/Ministral-3-3B-Instruct-2512-GGUF         Ministral-3-3B-Instruct-2512-Q8_0.gguf            no   3.4 GB. Instruction model, for a chat request. Not measured.
+ministral-8b          mistralai/Ministral-3-8B-Instruct-2512-GGUF         Ministral-3-8B-Instruct-2512-Q4_K_M.gguf          no   4.8 GB. Instruction model, for a chat request. Not measured.
+ministral-14b         mistralai/Ministral-3-14B-Instruct-2512-GGUF        Ministral-3-14B-Instruct-2512-Q4_K_M.gguf         no   7.7 GB. Instruction model, for a chat request. Not measured.
+mistral-small-24b     unsloth/Mistral-Small-3.2-24B-Instruct-2506-GGUF    Mistral-Small-3.2-24B-Instruct-2506-IQ4_XS.gguf   no   11.9 GB. Instruction model, for a chat request. Leaves about 4 GB of a 16 GB card. Not measured.
