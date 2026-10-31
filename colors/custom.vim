@@ -264,6 +264,14 @@ function! s:Accents() abort
   hi! link leanAttribute          customLightPurple
   hi! link leanHashCommand        customLightPurple
   hi! link leanSorry              customPink
+  " The goal window (syntax/leangoal.vim): its headings are entries, a case
+  " name is a label, and the turnstile is notation. An error is hot pink like
+  " sorry; warnings stay plain.
+  hi! link leangoalHeading        customLavendar
+  hi! link leangoalCase           customPink
+  hi! link leangoalTurnstile      customLightPurple
+  hi! link leangoalError          customPink
+  hi! link leangoalWarning        Normal
 
   " Lisp
   hi! link lispFunc customLavendar

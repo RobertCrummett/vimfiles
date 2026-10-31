@@ -1,19 +1,90 @@
-*lean.txt*   Lean 4: :make, symbols and colours                  *lean-plugin*
+*lean.txt*   Lean 4: goals, :make, symbols and colours           *lean-plugin*
 
                                                   *lean-local* *plugin-lean*
 Vim detects *.lean files and has nothing else for them. This is the rest,
 for Lean 4: ftplugin/lean.vim, compiler/lean.vim, syntax/lean.vim,
-autoload/lean.vim and plugin/lean.vim. There is no language server here, so
-no goal view: Lean is asked about a file with |:make|.
+autoload/lean.vim, autoload/lean/goal.vim and plugin/lean.vim.
 
-1. :make                                        |lean-make|
-2. Symbols                                      |lean-symbols|
-3. Colours                                      |lean-syntax|
-4. The rest of the filetype plugin              |lean-ftplugin|
-5. Options                                      |lean-options|
+1. The goal window                              |lean-goal|
+2. :make                                        |lean-make|
+3. Symbols                                      |lean-symbols|
+4. Colours                                      |lean-syntax|
+5. The rest of the filetype plugin              |lean-ftplugin|
+6. Options                                      |lean-options|
 
 ==============================================================================
-1. :make                                                          *lean-make*
+1. The goal window                                                *lean-goal*
+
+								  *:LeanGoal*
+:LeanGoal		Open the goal window, or close it when it is open.
+			<LocalLeader>g in a Lean buffer does the same.
+
+The window follows the cursor through every Lean buffer and shows what Lean
+knows about the place it is at: >
+
+    Tactic state (2 goals)
+    case left
+    p q : Prop
+    hp : p
+    ⊢ p
+
+    case right
+    p q : Prop
+    hp : p
+    ⊢ q
+
+    Messages
+    6:46 error
+    unsolved goals
+    ...
+<
+"Tactic state" is the goals inside a `by` block, "Expected type" the type
+of the term the cursor is in, and "Messages" every error, warning and
+#eval or #check result whose text includes the cursor's line. A part with
+nothing to say is left out. The window cannot be edited, and the cursor
+never goes there by itself; it is an ordinary window otherwise, to scroll,
+search and yank from. Beside the text when Vim is 130 columns or wider,
+under it when not.
+
+Which state ~
+Lean answers for a position between two characters, and Vim's cursor in
+Normal mode sits on one, so the position asked about is the left edge of
+the cursor. On the first character of a tactic that is the state before the
+tactic runs; anywhere further into it, the state after. So `^` on a line
+shows what the tactic is given and `$` what it leaves. In Insert mode the
+position is where the next character goes: at the end of a line, the state
+after it, which is the goal to write the next tactic for.
+
+Edits ~
+The window shows the buffer as it is, saved or not. Lean is told of a change
+when the cursor comes to rest, 80 ms after the last key, and elaborates the
+file again from the change down. "Lean is working …" appears above the old
+state when the answer takes more than a moment, as the first one in a
+project with many imports will.
+
+The server ~
+The answers come from Lean's language server, `lake serve` in a Lake project
+(|lean-make| says how one is found) and `lean --server` outside, run as a
+|job| and spoken to over its stdin and stdout. One per project, started when
+the window first needs it and never at startup, stopped when Vim exits.
+It holds every open file elaborated in memory, imports included.
+
+								*:LeanRestart*
+:LeanRestart		Stop the servers and start again from nothing. For
+			when Lean says the imports are out of date after a
+			file this one imports was changed, and for a server
+			that has died: one that stops by itself is not
+			started again until asked, and the window says so.
+
+								   *:LeanStop*
+:LeanStop		Stop the servers. The next cursor movement in a Lean
+			buffer with the window open starts one again.
+
+Only the goal window is taken from the server. Completion, hover and jumping
+to definitions are not, and |:make| does not go through it.
+
+==============================================================================
+2. :make                                                          *lean-make*
 
 |:make| checks the file being edited and puts Lean's errors and warnings in
 the quickfix list. Write the file first: Lean reads it from disk.
@@ -43,7 +114,7 @@ file by its path from the project root, which is not the current directory;
 the entry is pointed at the real file.
 
 ==============================================================================
-2. Symbols                                                     *lean-symbols*
+3. Symbols                                                     *lean-symbols*
 
 In Insert mode a backslash and a name give a symbol, by the names Lean's own
 editor support uses: >
@@ -63,7 +134,7 @@ is a string escape, so "a\n" types as written, which is why × is \times and
 ↑ is \up. A backslash that must not start a symbol is typed |i_CTRL-V| \.
 
 ==============================================================================
-3. Colours                                                      *lean-syntax*
+4. Colours                                                      *lean-syntax*
 
 syntax/lean.vim is deliberately small. It knows comments (nested, and doc
 comments), strings, characters and numbers, the keywords of commands and
@@ -74,8 +145,12 @@ In colors/custom.vim the declared name is lavender; strings and characters
 light pink; escapes, the braces of s!"{x}", attributes and #eval light
 purple; `sorry` hot pink. Keywords, sorts and numbers stay plain.
 
+The goal window has a syntax of its own, syntax/leangoal.vim, that marks its
+shape and nothing in the text: headings lavender, `case` lines and errors
+hot pink, the turnstile light purple.
+
 ==============================================================================
-4. The rest of the filetype plugin                            *lean-ftplugin*
+5. The rest of the filetype plugin                            *lean-ftplugin*
 
 'commentstring' and 'comments' for -- and /- -/, so |gq| formats comments
 and gc (|comments|) toggles them. Two spaces of indent. ' is a keyword
@@ -84,9 +159,26 @@ character, so h' is one word to |star| and |w|. |%| matches ⟨ ⟩ and ⟦ ⟧.
 |:MakeTags| knows Lean declarations (|tagsgen-languages|).
 
 ==============================================================================
-5. Options                                                     *lean-options*
+6. Options                                                     *lean-options*
 
 Set these in the vimrc.
+
+							  *g:lean_goal_auto*
+g:lean_goal_auto	1 to open the goal window with the first Lean buffer,
+			and so start a server for it. Default 0.
+
+						      *g:lean_goal_position*
+g:lean_goal_position	"right" or "below". Default: right when Vim is 130
+			columns or wider.
+
+				     *g:lean_goal_width* *g:lean_goal_height*
+g:lean_goal_width	Columns for a window on the right. Default a third
+			of the screen, 40 at least.
+g:lean_goal_height	Lines for a window below. Default 12.
+
+							 *g:lean_goal_delay*
+g:lean_goal_delay	Milliseconds the cursor has to rest before Lean is
+			asked. Default 80.
 
 							*g:lean_symbol_maps*
 g:lean_symbol_maps	0 to leave the symbol mappings out. Default 1.

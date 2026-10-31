@@ -35,10 +35,18 @@ if get(g:, 'lean_symbol_maps', 1)
   call lean#map()
 endif
 
+" The goal window: asked for by hand, or opened with the first Lean buffer.
+" Not from inside the FileType event, where the buffer is still being read.
+nnoremap <buffer> <silent> <LocalLeader>g :LeanGoal<CR>
+if get(g:, 'lean_goal_auto', 0)
+  call timer_start(0, {-> lean#goal#open()})
+endif
+
 let b:undo_ftplugin = 'setlocal commentstring< comments< formatoptions< shiftwidth<'
   \ . ' softtabstop< expandtab< iskeyword< matchpairs< suffixesadd< include<'
   \ . ' includeexpr< path< makeprg< errorformat<'
   \ . ' | unlet! b:lean_root | call lean#unmap()'
+  \ . ' | silent! nunmap <buffer> <LocalLeader>g'
 
 let &cpo = s:save_cpo
 unlet s:save_cpo

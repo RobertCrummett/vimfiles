@@ -7,6 +7,11 @@ let g:loaded_lean = 1
 
 command! -bar LeanSymbols call lean#list()
 
+" The goal window and the server behind it (autoload/lean/goal.vim).
+command! -bar LeanGoal    call lean#goal#toggle()
+command! -bar LeanRestart call lean#goal#restart()
+command! -bar LeanStop    call lean#goal#stop()
+
 " QuickFixCmdPost matches on the command, not the buffer, so it cannot be
 " set up by the filetype plugin. The buffer :make ran in is still current.
 augroup lean_make
