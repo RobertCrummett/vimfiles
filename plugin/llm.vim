@@ -9,8 +9,8 @@
 "   :LlmModel [name]  :LlmModels  :LlmDownload {name}
 "
 " The server (llama-server) is started in the background on the first
-" completion, never at startup, and stops when Vim exits or dies.
-" See :help llm.
+" completion, never at startup, and stops when Vim exits or dies. A model
+" running in mathterm is used instead of starting one. See :help llm.
 if exists('g:loaded_llm')
   finish
 endif

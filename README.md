@@ -161,6 +161,10 @@ around the cursor plus chunks from recent jump-list positions and sibling
 buffers. Weights live in `models/` (untracked); `models/registry.txt` records
 where each comes from and `:LlmDownload {name}` fetches them. See `:help llm`.
 
+A model running in the mathterm terminal is used instead of starting one: its
+window says where its models are in a file any program may read, and the
+plugin reads that before each request (`:help llm-mathterm`).
+
 `:LlmModels` lists the registry with a present/missing column, and
 `:LlmModel {name}` switches models for the rest of the session, with tab
 completion over the registry names. Measurements behind the current choices

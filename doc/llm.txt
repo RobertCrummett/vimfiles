@@ -15,6 +15,7 @@ Lives in plugin/llm.vim and autoload/llm.vim; models in models/.
 7. Commands                                     |llm-commands|
 8. Options                                      |llm-options|
 9. Choosing a model                             |llm-choosing|
+10. Beside mathterm                             |llm-mathterm|
 
 ==============================================================================
 1. Keys                                                            *llm-keys*
@@ -164,6 +165,8 @@ Lifecycle:
   crash does not leave it behind.
 - If a llama-server already answers on the port when the first request
   is made, it is used and left alone at exit.
+- If a model is running in mathterm, none of this happens: see
+  |llm-mathterm|.
 
 Two Vims at once ~                                               *llm-sharing*
 They share one server; two would not fit on a 6 GB card and would fight
@@ -343,6 +346,10 @@ A single menu suggestion is inserted straight away rather than shown,
 because 'completeopt' lacks `menuone`; add it to always see the menu.
                                                           *g:llm_no_mappings*
 g:llm_no_mappings       Set to 1 to define your own keys.
+                                                             *g:llm_mathterm*
+g:llm_mathterm          Set to 0 to leave mathterm's models alone and run
+                        this plugin's own server as if mathterm were not
+                        there. Default 1. See |llm-mathterm|.
 
 ==============================================================================
 9. Choosing a model                                            *llm-choosing*
@@ -361,5 +368,46 @@ generates about twice as fast as the 3B.
 
 For prose-heavy work, qwen3-4b is listed as a general model; it lacks
 fill-in-the-middle, so it only continues what is before the cursor.
+
+==============================================================================
+10. Beside mathterm                                            *llm-mathterm*
+
+A window of the mathterm terminal says where its models are in a file any
+program may read, model.txt in its data folder ($MATHTERM_DATA, or mathterm
+under $LOCALAPPDATA). While that file says a model is on, this plugin uses
+it and starts nothing of its own, wherever Vim is running. mathterm knows
+nothing of Vim; this is the plugin fitting in.
+
+The file is read before each request, so what changes in the window is seen
+on the next completion:
+
+- The helper is used if it is on, and otherwise the model. The helper is
+  small and has nothing else to do.
+- A server this Vim started is stopped once mathterm has a model on, as it
+  is holding memory on the card that the model needs.
+- While the model is starting or stopping, a request says so and does
+  nothing, so that nothing else goes on the card meanwhile.
+- While the model is answering someone else, a request says so and does
+  nothing: there is one slot, and the answer may be a long one. Between
+  those answers a completion costs a conversation very little, because the
+  server keeps what it held in memory and takes it back.
+- When mathterm has no model on, or no window, the plugin works as it
+  always has.
+
+A model is the window's to start and stop: |:LlmStop| leaves it running, and
+so does Vim's exit. |:LlmStatus| shows which one is in use.
+
+A model the registry lists with fill-in-the-middle is asked that way, as
+ever. Any other is given the text before the cursor to go on with, and the
+text after it is not seen. Chat models are poor at this: Bonsai 2 had the
+first word right in 5 of 32 masked lines, where the coder models in
+BENCHMARKS.md have 60 to 70% on a like set. A coder could be named as
+mathterm's `helper_model`, and would then be asked by fill-in-the-middle;
+how well one does the helper's own job has not been measured.
+
+The prompt is cut to the server's context, since that is not this plugin's
+to set: the end is kept. |g:llm_model| and the other server options apply
+only to a server of this plugin's own. |g:llm_mathterm| turns all of this
+off.
 
  vim:tw=78:ts=8:ft=help:norl:

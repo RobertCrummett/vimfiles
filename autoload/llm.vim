@@ -3,6 +3,7 @@
 let s:root = expand('<sfile>:p:h:h')
 let s:state = 'stopped'        " stopped | starting | ready | external
 let s:job = v:null             " the server job (only when we started it)
+let s:found = {}               " the mathterm server in use (s:mathterm_server)
 let s:req = v:null             " the in-flight request (see s:http)
 let s:pending = []             " closures waiting for the server
 let s:log = []
@@ -116,8 +117,12 @@ function! s:port() abort
   return s:opt('port', 8797)
 endfunction
 
+function! s:address() abort
+  return empty(s:found) ? '127.0.0.1:' . s:port() : s:found.address
+endfunction
+
 function! s:url(path) abort
-  return 'http://127.0.0.1:' . s:port() . a:path
+  return 'http://' . s:address() . a:path
 endfunction
 
 " ------------------------------------------------------------- registry
@@ -191,6 +196,9 @@ function! s:model_name() abort
 endfunction
 
 function! s:model_is_fim() abort
+  if !empty(s:found)
+    return s:found.fim
+  endif
   let l:e = s:entry(s:model_name())
   return empty(l:e) ? 1 : l:e.fim
 endfunction
@@ -215,7 +223,9 @@ function! llm#set_model(name) abort
     return
   endif
   let g:llm_model = a:name
-  if s:state ==# 'ready' || s:state ==# 'starting'
+  if !empty(s:found)
+    echo 'llm: model set to ' . a:name . ', for when mathterm has none on'
+  elseif s:state ==# 'ready' || s:state ==# 'starting'
     call llm#stop()
     echo 'llm: model set to ' . a:name . '; the server restarts on the next completion'
   else
@@ -416,6 +426,125 @@ function! llm#devices() abort
   endfor
 endfunction
 
+" ------------------------------------------------------------- mathterm
+
+" A window of mathterm says where its models are in a file for any program
+" to read, model.txt in its data folder, one `name = value` to a line.
+" Nothing there knows of Vim. The file goes when the window does; one left
+" by a window that died names a port nobody answers, which is found out by
+" asking. A model is the window's to start and stop, so one found here is
+" only ever used.
+function! s:mathterm_says() abort
+  let l:folder = empty($MATHTERM_DATA) ? $LOCALAPPDATA . '/mathterm' : $MATHTERM_DATA
+  let l:file = l:folder . '/model.txt'
+  let l:says = {}
+  if filereadable(l:file)
+    for l:line in readfile(l:file)
+      let l:m = matchlist(l:line, '^\(\S\+\) = \(.*\)$')
+      if !empty(l:m)
+        let l:says[l:m[1]] = l:m[2]
+      endif
+    endfor
+  endif
+  return l:says
+endfunction
+
+" The server to use: the helper before the model, being quick and having
+" nothing else to do, and the model when it is alone. {'waiting': why} when
+" the model is on its way up or down, so that nothing else goes on the card
+" meanwhile; {} when mathterm has nothing to offer.
+function! s:mathterm_server() abort
+  if !s:opt('mathterm', 1)
+    return {}
+  endif
+  let l:says = s:mathterm_says()
+  if get(l:says, 'helper', '') ==# 'on' && has_key(l:says, 'helper_address')
+    return {'name': 'helper', 'address': l:says.helper_address}
+  endif
+  if get(l:says, 'main', '') ==# 'on' && has_key(l:says, 'main_address')
+    return {'name': 'model', 'address': l:says.main_address}
+  endif
+  if get(l:says, 'main', '') =~# '^\%(starting\|stopping\)$'
+    return {'waiting': l:says.main}
+  endif
+  return {}
+endfunction
+
+" What the server has loaded decides how it is asked. A model the registry
+" knows for fill-in-the-middle gets /infill. Others are given the text before
+" the cursor to go on with: a chat model has the tokens /infill needs and
+" does nothing useful with them. Measured with Bonsai 2 on 32 lines of this
+" repository and mathterm's: the first word was right 0 times by /infill, 5
+" by /completion and 4 by a chat request with a marker at the cursor.
+function! s:mathterm_props(reply) abort
+  if s:state !=# 'starting' || empty(s:found)
+    return
+  endif
+  if has_key(a:reply, 'error')
+    let s:found = {}
+    let s:state = 'stopped'
+    if !s:start_own()
+      let s:pending = []
+    endif
+    return
+  endif
+  try
+    let l:props = json_decode(a:reply.body)
+  catch
+    let l:props = {}
+  endtry
+  if a:reply.status != 200 || type(l:props) != v:t_dict
+    let l:name = s:found.name
+    let s:found = {}
+    let s:state = 'stopped'
+    let s:pending = []
+    call s:say('llm: the ' . l:name . ' in mathterm is still loading; ask again when it is on')
+    return
+  endif
+  let l:file = fnamemodify(substitute(get(l:props, 'model_path', ''), '\\', '/', 'g'), ':t')
+  let s:found.file = l:file
+  let s:found.context = get(get(l:props, 'default_generation_settings', {}), 'n_ctx', 0)
+  let s:found.fim = !empty(filter(llm#registry(), 'v:val.fim && v:val.file ==? l:file'))
+  let s:state = 'external'
+  call s:say(printf('llm: using the %s in mathterm: %s', s:found.name, l:file))
+  call s:when_free(function('s:flush_pending'))
+endfunction
+
+" What mathterm has may have changed since the last request, and a look at
+" its file costs less than the request. A server started here goes as soon
+" as there is a model there, because it is holding memory that model needs.
+function! s:follow_mathterm() abort
+  let l:there = s:mathterm_server()
+  if !empty(s:found)
+    if get(l:there, 'address', '') !=# s:found.address
+      let s:found = {}
+      let s:state = 'stopped'
+    endif
+  elseif (s:state ==# 'ready' || s:state ==# 'external') && !empty(l:there) && !has_key(l:there, 'waiting')
+    call llm#stop(1)
+  endif
+endfunction
+
+" A mathterm server has one slot, and what it is doing may be a long answer
+" to someone else, which a request would wait behind. Looking takes a
+" millisecond. Between the rounds of a turn it is free, and a completion
+" sent then is no loss to the conversation: the server keeps what it held
+" in memory and takes it back when the conversation returns (6835 tokens
+" came back in 0.2 s; all of Bonsai's 65536 are 2.2 GiB, and its limit is 8).
+function! s:when_free(Fn) abort
+  call s:http('GET', '/slots', '', function('s:slots_seen', [a:Fn]), 1000)
+endfunction
+
+function! s:slots_seen(Fn, reply) abort
+  if get(a:reply, 'body', '') =~# '"is_processing"\s*:\s*true'
+    let s:last = {'outcome': 'busy'}
+    let s:pending = []
+    call s:progress('llm: the ' . s:found.name . ' in mathterm is answering; ask again when it has')
+    return
+  endif
+  call s:guarded(a:Fn, [])
+endfunction
+
 " ---------------------------------------------------------- http client
 
 " The server is spoken to over a raw channel: no process per request (a
@@ -431,7 +560,8 @@ endfunction
 function! s:http(method, path, body, Cb, timeout_ms, ...) abort
   let l:r = {'buf': '', 'pos': 0, 'body': '', 'hdr': 0, 'chunked': 0, 'clen': -1, 'complete': 0,
     \ 'done': 0, 'status': 0, 'Cb': a:Cb, 'Stream': a:0 ? a:1 : v:null, 'start': reltime(), 'timer': -1}
-  let l:ch = ch_open('127.0.0.1:' . s:port(), {'mode': 'raw', 'waittime': 300, 'drop': 'never',
+  let l:address = s:address()
+  let l:ch = ch_open(l:address, {'mode': 'raw', 'waittime': 300, 'drop': 'never',
     \ 'callback': function('s:http_data', [l:r]), 'close_cb': function('s:http_closed', [l:r])})
   let l:r.ch = l:ch
   if ch_status(l:ch) !=# 'open'
@@ -439,7 +569,7 @@ function! s:http(method, path, body, Cb, timeout_ms, ...) abort
     call a:Cb({'error': 'connect'})
     return l:r
   endif
-  let l:req = a:method . ' ' . a:path . " HTTP/1.1\r\nHost: 127.0.0.1:" . s:port()
+  let l:req = a:method . ' ' . a:path . " HTTP/1.1\r\nHost: " . l:address
     \ . "\r\nConnection: close\r\nAccept: application/json\r\n"
   if !empty(a:body)
     let l:req .= "Content-Type: application/json\r\nContent-Length: " . len(a:body) . "\r\n"
@@ -547,12 +677,29 @@ function! s:health(Cb) abort
     \ : get(r, 'status', 0) == 200 && get(r, 'body', '') =~# '"ok"' ? 'ok' : 'loading')}, 2000)
 endfunction
 
-" Start the server unless one is already answering on the port. Returns 1
-" when a server is ready or on its way, 0 when it cannot be started.
+" Use a model running in mathterm, or else start a server unless one is
+" already answering on the port. Returns 1 when a server is ready or on its
+" way, 0 when there is none to be had.
 function! llm#start() abort
   if s:state ==# 'ready' || s:state ==# 'starting' || s:state ==# 'external'
     return 1
   endif
+  let l:there = s:mathterm_server()
+  if empty(l:there)
+    return s:start_own()
+  endif
+  if has_key(l:there, 'waiting')
+    call s:say('llm: the model in mathterm is ' . l:there.waiting . '; ask again when it is on')
+    return 0
+  endif
+  let s:found = l:there
+  let s:state = 'starting'
+  call s:progress('llm: looking at the ' . l:there.name . ' in mathterm ...')
+  call s:http('GET', '/props', '', function('s:mathterm_props'), 2000)
+  return 1
+endfunction
+
+function! s:start_own() abort
   let l:exe = s:server_exe()
   if empty(l:exe)
     call s:error('llm: llama-server not found; install llama.cpp (winget install ggml.llamacpp) or set g:llm_server')
@@ -697,8 +844,8 @@ function! s:exit_cb(job, status) abort
   endif
 endfunction
 
-" Stop the server if we started it. A server found already running is
-" left alone unless "force" is given.
+" Stop the server if we started it. A server found already running, or
+" in mathterm, is left alone.
 function! llm#stop(...) abort
   let l:quiet = a:0 && a:1
   call llm#dismiss()
@@ -712,6 +859,7 @@ function! llm#stop(...) abort
   let s:pending = []
   let l:was = s:state
   let s:state = 'stopped'
+  let s:found = {}
   if !l:quiet
     echo l:was ==# 'external' ? 'llm: not stopping a server this Vim did not start' : 'llm: stopped'
   endif
@@ -719,6 +867,10 @@ endfunction
 
 function! llm#status() abort
   let l:lines = ['llm: ' . s:state . ', model ' . s:model_name() . ', port ' . s:port()]
+  if has_key(s:found, 'file')
+    let l:lines[0] = printf('llm: using the %s in mathterm: %s, %s, %d tokens of context, %s', s:found.name,
+      \ s:found.file, s:found.address, s:found.context, s:found.fim ? 'fill-in-the-middle' : 'text before the cursor only')
+  endif
   let l:p = llm#model_path(s:model_name())
   call add(l:lines, '  weights: ' . (empty(l:p) ? 'missing (:LlmDownload ' . s:model_name() . ')' : l:p))
   call add(l:lines, '  server:  ' . (empty(s:server_exe()) ? 'llama-server not found' : s:server_exe()))
@@ -876,7 +1028,10 @@ endfunction
 " becomes ready.
 function! s:when_ready(Fn) abort
   let s:last_fn = a:Fn
-  if s:state ==# 'ready' || s:state ==# 'external'
+  call s:follow_mathterm()
+  if !empty(s:found) && s:state ==# 'external'
+    call s:when_free(a:Fn)
+  elseif s:state ==# 'ready' || s:state ==# 'external'
     call s:guarded(a:Fn, [])
   elseif s:state ==# 'starting'
     call add(s:pending, a:Fn)
@@ -991,7 +1146,14 @@ function! s:request(ctx, n_predict, Cb, what, ...) abort
       \ 'input_suffix': a:ctx.suffix, 'input_extra': a:ctx.extra}), a:Cb, a:what] + l:more)
   else
     let l:head = join(map(copy(a:ctx.extra), '"// " . v:val.filename . "\n" . v:val.text'), "\n\n")
-    call call('s:post', ['/completion', extend(l:common, {'prompt': (empty(l:head) ? '' : l:head . "\n\n") . a:ctx.prefix}), a:Cb, a:what] + l:more)
+    let l:prompt = (empty(l:head) ? '' : l:head . "\n\n") . a:ctx.prefix
+    " /completion refuses what does not fit, and a mathterm server's context
+    " is not ours to set: its helper has 8192 tokens.
+    let l:most = empty(s:found) ? 0 : (s:found.context - a:n_predict) * 2
+    if l:most > 0 && len(l:prompt) > l:most
+      let l:prompt = substitute(strpart(l:prompt, len(l:prompt) - l:most), '^[^\n]*\n', '', '')
+    endif
+    call call('s:post', ['/completion', extend(l:common, {'prompt': l:prompt}), a:Cb, a:what] + l:more)
   endif
 endfunction
 

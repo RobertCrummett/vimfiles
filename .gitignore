@@ -50,3 +50,6 @@
 # setting that stops it opening an editor at every breakpoint never reaches a
 # desktop Matlab. Created by :MatlabStart.
 /matlab/prefs/
+
+# What tests/mathterm.vim writes
+tests/mathterm.out
