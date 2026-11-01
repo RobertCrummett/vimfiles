@@ -78,6 +78,20 @@ function! s:warm() abort
   sleep 100m
 endfunction
 
+" The keys themselves, in Insert mode, at the end of a line. Insert mode is
+" left once the answer has come, after typing `then`.
+function! s:finish(then, timer) abort
+  call feedkeys(a:then . "\<Esc>", 't')
+endfunction
+
+function! s:typed(line, keys, then) abort
+  call setline(1, ['let x = 1', a:line])
+  call llm#reset_last()
+  call timer_start(700, function('s:finish', [a:then]))
+  call feedkeys('2GA' . a:keys, 'tx!')
+  return getline(2)
+endfunction
+
 function! s:is(what, got, wanted) abort
   if a:got ==# a:wanted
     let s:passed += 1
@@ -144,6 +158,17 @@ function! s:run() abort
   call s:is('and keeps the end', l:sent =~# 'line 180', 1)
   call setline(1, ['let x = 1', 'let y = 2'])
   silent 3,$delete _
+  call s:stop(l:main)
+
+  " The reply begins with a space, as a model going on from text does, and the
+  " cursor is past one already. Indentation is not that.
+  call s:fresh()
+  let l:main = s:stand_in(s:main_port, 'bonsai.gguf')
+  call s:is('the menu', s:typed('let y = ', "\<C-X>\<C-A>", ''), 'let y = the')
+  call s:is('a block', s:typed('let y = ', "\<C-X>\<C-B>", "\<C-Y>"), 'let y = the answer')
+  call s:is('no space to spare', s:typed('let y =', "\<C-X>\<C-A>", ''), 'let y = the')
+  call s:is('indentation', s:typed('    ', "\<C-X>\<C-A>", ''), '     the')
+  call setline(1, ['let x = 1', 'let y = 2'])
   call s:stop(l:main)
 
   " Busy: nothing is sent, and it says so. A long answer is not waited behind.

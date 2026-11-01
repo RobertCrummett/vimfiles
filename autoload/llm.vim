@@ -1212,11 +1212,19 @@ function! s:menu_now() abort
     \ {'t_max_predict_ms': s:opt('menu_ms', 1500)})
 endfunction
 
+" What the model wrote, as it goes at the cursor. Going on from text, a model
+" begins its next word with a space even where the text already ends in one
+" (`return ` became `return  a`). Indentation is left as it is.
+function! s:reply(ctx, resp) abort
+  let l:text = get(a:resp, 'content', '')
+  return a:ctx.prefix =~# '[^ \t\n][ \t]$' ? substitute(l:text, '^ ', '', '') : l:text
+endfunction
+
 function! s:menu_show(ctx, resp) abort
   if mode() !~# '^i' || line('.') != a:ctx.lnum || col('.') != a:ctx.col
     return
   endif
-  let l:text = get(a:resp, 'content', '')
+  let l:text = s:reply(a:ctx, a:resp)
   let l:first = matchstr(l:text, '^[^\n]*')
   if empty(trim(l:first))
     " The model wants to end this line. Offer its next line as ghost text
@@ -1286,7 +1294,7 @@ function! s:block_stream(ctx, resp) abort
     call s:http_cancel(s:req)
     return
   endif
-  let [l:lines, l:capped] = s:block_lines(a:ctx, get(a:resp, 'content', ''))
+  let [l:lines, l:capped] = s:block_lines(a:ctx, s:reply(a:ctx, a:resp))
   if empty(l:lines) || empty(trim(join(l:lines, "\n")))
     return
   endif
@@ -1307,7 +1315,7 @@ function! s:block_show(ctx, resp) abort
   if mode() !~# '^i' || line('.') != a:ctx.lnum || col('.') != a:ctx.col
     return
   endif
-  let [l:lines, l:capped] = s:block_lines(a:ctx, get(a:resp, 'content', ''))
+  let [l:lines, l:capped] = s:block_lines(a:ctx, s:reply(a:ctx, a:resp))
   if empty(l:lines) || empty(trim(join(l:lines, "\n")))
     call llm#dismiss()
     let s:last.outcome = 'empty'
