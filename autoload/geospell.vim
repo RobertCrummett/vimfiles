@@ -141,13 +141,88 @@ function! geospell#remove_list(gone) abort
   echomsg 'geospell: removed ' . join(l:gone, ', ') . ' (kept out by reject.txt)'
 endfunction
 
-" Command forms: a few words as arguments, or the word under the cursor.
-function! geospell#add(...) abort
-  call geospell#add_list(empty(a:000) ? [expand('<cword>')] : a:000)
+" The word under the cursor, as spelling reads it. An apostrophe is inside a
+" word for en_us, so Parseval's is one word where <cword> stops at the
+" apostrophe. One at either end is a quotation mark.
+function! s:cursor_word() abort
+  let l:isk = &l:iskeyword
+  setlocal iskeyword+=39
+  let l:word = expand('<cword>')
+  let &l:iskeyword = l:isk
+  return trim(l:word, "'")
+endfunction
+
+" The words spelling marks as bad in a:parts, each [lnum, first col, last col]:
+" what is underlined, so no LaTeX command or Typst code, and as for a harvest
+" no missing capital or regional spelling. A word counts when it starts in the
+" part. 'spell' need not be on.
+function! s:marked(parts) abort
+  let l:view = winsaveview()
+  let l:spell = &l:spell
+  noautocmd setlocal spell
+  let l:words = []
+  try
+    for [l:lnum, l:first, l:last] in a:parts
+      call cursor(l:lnum, l:first)
+      while 1
+        let [l:word, l:kind] = spellbadword()
+        let l:col = col('.')
+        if empty(l:word) || l:col > l:last
+          break
+        endif
+        if l:kind ==# 'bad' && l:col >= l:first
+          call add(l:words, l:word)
+        endif
+        if l:col + len(l:word) >= col('$')
+          break
+        endif
+        call cursor(l:lnum, l:col + len(l:word))
+      endwhile
+    endfor
+  finally
+    noautocmd let &l:spell = l:spell
+    call winrestview(l:view)
+  endtry
+  return uniq(sort(l:words))
+endfunction
+
+" The words in a range. A Visual selection of one word is that word exactly,
+" less the punctuation that vE or viW takes along; the pattern also keeps out
+" / and #, which mean something in the .dic and in words.txt. Anything wider
+" holds ordinary words as well, so only the marked ones count.
+function! s:range_words(range, line1, line2) abort
+  " It is a selection when it is the lines of the last one, unless that was
+  " of whole lines, which is a range like any other.
+  let l:mode = visualmode()
+  if a:range < 2 || empty(l:mode) || l:mode ==# 'V' || [a:line1, a:line2] != [line("'<"), line("'>")]
+    return s:marked(map(range(a:line1, a:line2), {_, lnum -> [lnum, 1, v:maxcol]}))
+  endif
+  let l:region = [getpos("'<"), getpos("'>"), {'type': l:mode}]
+  let l:word = substitute(trim(join(call('getregion', l:region))), '^[[:punct:]]\+\|[[:punct:]]\+$', '', 'g')
+  if l:word =~# '^[^[:space:][:punct:]]\+\%([''-][^[:space:][:punct:]]\+\)*$'
+    return [l:word]
+  endif
+  return s:marked(map(call('getregionpos', l:region), {_, part -> [part[0][1], part[0][2], part[1][2]]}))
+endfunction
+
+" Command forms: a few words as arguments, or a range, or the word under the
+" cursor.
+function! geospell#add(range, line1, line2, ...) abort
+  if a:0
+    call geospell#add_list(a:000)
+  elseif !a:range
+    call geospell#add_list([s:cursor_word()])
+  else
+    let l:words = s:range_words(a:range, a:line1, a:line2)
+    if empty(l:words)
+      echohl WarningMsg | echomsg 'geospell: nothing in the range is marked as misspelled' | echohl None
+    endif
+    call geospell#add_list(l:words)
+  endif
 endfunction
 
 function! geospell#remove(...) abort
-  call geospell#remove_list(empty(a:000) ? [expand('<cword>')] : a:000)
+  call geospell#remove_list(empty(a:000) ? [s:cursor_word()] : a:000)
 endfunction
 
 " --------------------------------------------------------------- harvest

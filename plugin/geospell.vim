@@ -2,6 +2,8 @@
 "
 "   :GeoSpellBuild              compile words.txt into spell/geophysics.utf-8.spl
 "   :GeoSpellAdd [words]        add words (default: word under cursor), rebuild
+"   :[range]GeoSpellAdd         add the selected word, or the words marked as
+"                               misspelled in the range, rebuild
 "   :GeoSpellRemove [words]     remove words and keep them out, rebuild
 "   :GeoSpellHarvest [paths]    list words unknown to en_us found in files,
 "                               for review; then :GeoSpellAccept
@@ -19,7 +21,7 @@ let g:geospell_min_count = get(g:, 'geospell_min_count', 2)
 let g:geospell_max_file_size = get(g:, 'geospell_max_file_size', 3 * 1024 * 1024)
 
 command! -bar                            GeoSpellBuild   call geospell#build()
-command! -bar -nargs=*                   GeoSpellAdd     call geospell#add(<f-args>)
+command! -bar -nargs=* -range            GeoSpellAdd     call geospell#add(<range>, <line1>, <line2>, <f-args>)
 command! -bar -nargs=*                   GeoSpellRemove  call geospell#remove(<f-args>)
 command! -bar -nargs=* -complete=file    GeoSpellHarvest call geospell#harvest(g:geospell_min_count, <f-args>)
 command! -bar                            GeoSpellAccept  call geospell#accept()

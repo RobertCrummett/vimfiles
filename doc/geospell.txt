@@ -52,12 +52,28 @@ is separate from this dictionary. Use `zg` for one-off words and
 
 One or a few words ~
                                                                 *:GeoSpellAdd*
-:GeoSpellAdd            Add the word under the cursor.
+:GeoSpellAdd            Add the word under the cursor, as spelling reads it:
+                        on `Parseval's` that is all of it.
 :GeoSpellAdd {words}    Add each word given.
+:'<,'>GeoSpellAdd       Add the word selected in Visual mode, exactly as
+                        selected, less any punctuation at its ends: `vE` over
+                        `(Parseval's),` adds `Parseval's`.
+:{range}GeoSpellAdd     Add the words marked as misspelled in {range}: lines,
+                        or a Visual selection of several words. Words spelled
+                        right, LaTeX commands and Typst code stay out, and so
+                        do the milder marks, a missing capital and a regional
+                        or rare spelling: add such a word by itself. A real
+                        typo is marked too, so read the underlines first, or
+                        use |:GeoSpellHarvest|, which has a review. Works
+                        with 'spell' off as well.
 
 The words go into words.txt, are removed from reject.txt if they were
 there, and the dictionary is rebuilt at once, so the red underline goes away
 without leaving Vim.
+
+For `en_us` an apostrophe is inside a word, and there are no affix rules
+(|geospell-build|), so `Parseval` on the list does not cover `Parseval's`.
+Each needs a line of its own.
 
 Many words at once ~
                                           *:GeoSpellHarvest* *:GeoSpellAccept*
