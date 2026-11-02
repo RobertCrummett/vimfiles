@@ -61,7 +61,9 @@ endif
 
 set autoindent smarttab expandtab
 " NOTE fo-=tc is for no automatic formatting. manually format with gq
-set formatoptions+=jro/nq fo-=tc textwidth=80 nojoinspaces
+" NOTE no n in fo: gq would take a line that starts with 0.9 or 10 km for a
+" numbered list and stop joining there. Numbered lists are the rare case.
+set formatoptions+=jro/q fo-=tc textwidth=80 nojoinspaces
 nnoremap Q gq
 
 set autoread
