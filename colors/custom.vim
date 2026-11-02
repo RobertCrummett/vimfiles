@@ -251,19 +251,27 @@ function! s:Accents() abort
   " colour of labels and jumps rather than that of the other keywords.
   hi! link matlabScope            customPink
 
-  " Lean (syntax/lean.vim), in Rust's colours. The name a def, theorem or
-  " structure introduces is lavender. Text literals are light pink; escapes,
-  " the braces of s!"{x}", @[attributes] and the # of #eval and #check are
-  " notation, light purple. sorry is hot pink: where Lean stops checking.
-  " Keywords, sorts and numbers stay plain.
-  hi! link leanDeclarationName    customLavendar
-  hi! link leanString             customLightPink
-  hi! link leanChar               customLightPink
-  hi! link leanEscape             customLightPurple
-  hi! link leanInterpolationDelim customLightPurple
-  hi! link leanAttribute          customLightPurple
-  hi! link leanHashCommand        customLightPurple
-  hi! link leanSorry              customPink
+  " Lean (syntax/lean.vim), in Rust's colours. The name a declaration, namespace
+  " or section introduces is lavender, and so are tactics, which are macro
+  " calls; both get there through Function. Text literals are light pink. true
+  " and false, @[attributes], #commands, the options of set_option and the holes
+  " ?_ and ?x are notation, light purple, as are escapes and the braces of
+  " s!"{x}", through SpecialChar. So are the logic of a statement and the shape
+  " of a proof: quantifiers, connectives, arrows, the brackets of an anonymous
+  " constructor, the focus dot and <;>. Keywords, sorts, numbers and arithmetic
+  " stay plain. Hot pink is kept for one thing here: where Lean stops checking,
+  " as with Rust's unsafe. A sorry in a proof is the word to find in a Lean
+  " file, so no label or section name shares its colour. Doc comments are
+  " comments.
+  hi! link leanString    customLightPink
+  hi! link leanChar      customLightPink
+  hi! link leanBoolean   customLightPurple
+  hi! link leanAttribute customLightPurple
+  hi! link leanCommand   customLightPurple
+  hi! link leanOption    customLightPurple
+  hi! link leanHole      customLightPurple
+  hi! link leanNotation  customLightPurple
+  hi! link leanUnchecked customPink
   " The goal window (syntax/leangoal.vim): its headings are entries, a case
   " name is a label, and the turnstile is notation. An error is hot pink like
   " sorry; warnings stay plain.

@@ -136,14 +136,23 @@ is a string escape, so "a\n" types as written, which is why × is \times and
 ==============================================================================
 4. Colours                                                      *lean-syntax*
 
-syntax/lean.vim is deliberately small. It knows comments (nested, and doc
-comments), strings, characters and numbers, the keywords of commands and
-terms, the name after def, theorem, structure and the like, @[attributes],
-and the # commands. It does not know tactics or library names.
+syntax/lean.vim knows comments (nested, and doc comments), strings, characters
+and numbers, the keywords of commands and terms, the name after def, theorem,
+structure, namespace and the like, @[attributes], the # commands, the options
+of set_option, the holes ?_ and ?x, and the tactics.
 
-In colors/custom.vim the declared name is lavender; strings and characters
-light pink; escapes, the braces of s!"{x}", attributes and #eval light
-purple; `sorry` hot pink. Keywords, sorts and numbers stay plain.
+The tactics are a fixed list, from Lean's parser table with Mathlib loaded,
+kept by how Mathlib uses them; the comment above it has the rule. A new tactic
+or a macro of your own stays plain until it is added there. left, right, symm
+and trans are left out, as they are mostly ordinary names.
+
+In colors/custom.vim the declared name and the tactics are lavender; strings
+and characters light pink; escapes, the braces of s!"{x}", attributes, #eval,
+options, holes, true and false light purple, and so are the logic of a
+statement and the shape of a proof: quantifiers, connectives, arrows, ⟨ ⟩, the
+focus dot and <;>. Hot pink is where Lean stops checking and nothing else:
+`sorry`, `admit`, `stop`, `axiom`, `native_decide`, `unsafe` and `partial`.
+Keywords, sorts, numbers and arithmetic stay plain.
 
 The goal window has a syntax of its own, syntax/leangoal.vim, that marks its
 shape and nothing in the text: headings lavender, `case` lines and errors
