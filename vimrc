@@ -204,14 +204,4 @@ if !exists('g:sexp_loaded')
   let g:sexp_filetypes = 'clojure,scheme,lisp,timl,fennel,racket'
 endif
 
-" augroup custom_highlight_todo_words
-"   au!
-"   au Syntax * syntax keyword Todo NOTE containedin=.*Comment.*
-" augroup END
-
 let maplocalleader = "\\"
-
-" function! LispColorscheme()
-"   colorscheme quiet
-"   hi! racketParen guifg=#22ddaa
-" endfunction
