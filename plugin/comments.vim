@@ -109,7 +109,6 @@ function! s:ProcessCommentRange(start_line, end_line) abort
     endif
   endfor
 
-  let l:view = winsaveview()
   for l:lnum in l:lnums
     let l:line = getline(l:lnum)
     let l:indent = matchstr(l:line, '^\s*')
@@ -129,7 +128,6 @@ function! s:ProcessCommentRange(start_line, end_line) abort
       call setline(l:lnum, l:indent . l:leader . ' ' . l:text)
     endif
   endfor
-  call winrestview(l:view)
 endfunction
 
 " Operator function. Works linewise whatever the motion or Visual mode was,
