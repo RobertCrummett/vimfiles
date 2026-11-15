@@ -144,9 +144,15 @@ function! diredit#hijack(name) abort
     return
   endif
   let l:old = bufnr('%')
+  let l:alt = bufnr('#')
   call diredit#open(a:name)
   if bufnr('%') != l:old
     execute 'silent! bwipeout' l:old
+    " The wiped buffer was the alternate file; put back the one before it,
+    " the file the browsing started from (not when that was a listing).
+    if l:alt > 0 && l:alt != l:old && bufexists(l:alt) && bufname(l:alt) !~# '^diredit://'
+      let @# = l:alt
+    endif
   endif
 endfunction
 
@@ -326,7 +332,13 @@ function! s:parse(line, lnum) abort
     let l:name = a:line
   endif
   let l:name = substitute(l:name, '\\', '/', 'g')
-  let l:name = trim(l:name)
+  " A line left as it was drawn names the entry as it is on disk, so a name
+  " that begins or ends with a space is not read as a rename to the trimmed
+  " one. Space around a name that was typed is dropped.
+  if !(l:id && has_key(s:entries, l:id) && l:name ==# fnamemodify(s:entries[l:id].path, ':t')
+        \ . (s:entries[l:id].isdir ? '/' : ''))
+    let l:name = trim(l:name)
+  endif
   let l:isdir = l:name =~# '/$'
   let l:name = substitute(l:name, '/\+$', '', '')
   return {'id': l:id, 'name': l:name, 'isdir': l:isdir, 'lnum': a:lnum}
@@ -341,7 +353,9 @@ function! s:validate_name(name) abort
       return '"' . l:part . '" is not allowed in a name'
     endif
   endfor
-  let l:body = has('win32') ? substitute(a:name, '^[A-Za-z]:', '', '') : a:name
+  " Only the drive of an absolute path may carry a colon: "C:name" is not
+  " one, and written under the listing it would name a stream of a file "C".
+  let l:body = has('win32') ? substitute(a:name, '^[A-Za-z]:\ze/', '', '') : a:name
   if has('win32') && l:body =~# '[<>:"|?*]'
     return 'invalid character in "' . a:name . '"'
   endif
@@ -559,6 +573,16 @@ function! s:execute(op) abort
   return ''
 endfunction
 
+" Whether another op in the list has this op's source as its destination.
+function! s:in_the_way(op, ops) abort
+  for l:other in a:ops
+    if l:other isnot a:op && s:same_path(l:other.dest, a:op.src)
+      return 1
+    endif
+  endfor
+  return 0
+endfunction
+
 " Moves and copies can depend on each other (a -> b while b -> a, or a
 " copy of a file that is also being renamed). Run whatever is unblocked;
 " break cycles by parking a source under a temporary name.
@@ -588,8 +612,11 @@ function! s:execute_transfers(ops) abort
     if l:progress
       continue
     endif
-    " Everything left is blocked: park the first move's source.
-    let l:moves = filter(copy(l:pending), 'v:val.op ==# "move"')
+    " Everything left is blocked: park the first move's source that another
+    " op is waiting for, which is what a cycle is made of. A source nothing
+    " waits for is blocked by a file that is staying (a deletion or move
+    " that failed), and parking it would only rename it again and again.
+    let l:moves = filter(copy(l:pending), 'v:val.op ==# "move" && s:in_the_way(v:val, l:pending)')
     if empty(l:moves)
       for l:op in l:pending
         call add(l:failures, s:describe(l:op) . ': destination is occupied')

@@ -11,12 +11,13 @@ Because I always come back to this editor, I might as well study the language of
 
 ## Local plugins
 
-- **colors/custom.vim** — the bundled `quiet` scheme plus four accents used
+- **colors/custom.vim** — the bundled `quiet` scheme plus five accents used
   consistently across languages (lavender for functions, light purple for
-  special characters/notation/options, pink for labels/links and vimscript
-  keywords, light blue for text completion inserts or offers, including the
-  llm plugin's ghost text). Language-specific links live at the end of the
-  file.
+  special characters/notation/options and math, pink for labels/links and
+  vimscript keywords, light pink for string literals and raw text, light
+  blue for text completion inserts or offers, including the llm plugin's
+  ghost text). Language-specific links live in `s:Accents()` at the top of
+  the file.
 - **plugin/comments.vim** — `gc{motion}`, `gcc`, and `gc` in Visual mode
   toggle line comments; dot-repeatable, counts work. Leaders for ~140
   filetypes in `g:comment_map`; `b:comment_leader` overrides per buffer.
@@ -56,7 +57,7 @@ Because I always come back to this editor, I might as well study the language of
   `\<` ⟨, `\a` α and so on (`:LeanSymbols` lists them). Declared names and
   tactics are lavender; quantifiers, connectives, arrows, `⟨ ⟩`, the focus
   dot, `<;>`, attributes and `#check` light purple; strings light pink; and
-  hot pink only where Lean stops checking: `sorry`, `admit`, `axiom`,
+  hot pink only where Lean stops checking: `sorry`, `admit`, `stop`, `axiom`,
   `native_decide`, `unsafe`, `partial`. `:LeanGoal` opens a read-only window
   that follows the cursor with the tactic state, the expected type and
   Lean's messages for the line, asked of Lean's language server (`lake
@@ -83,10 +84,10 @@ headwords that start with it, so complete the word first and press
 
 ## Tags without ctags
 
-`:MakeTags [dir]` walks a directory tree and writes `dir/tags` using only
-Vim: `plugin/tagsgen.vim` holds a table of definition patterns per filetype
-(C/C++, Rust, Python, Go, JavaScript, Lua, Vim script, shell, PowerShell,
-batch, MATLAB, Scheme/Racket/Lisp, Typst, TeX, Markdown headings) and
+`:MakeTags [dir] [into]` walks a directory tree and writes `into/tags`
+(`dir/tags` when `into` is left out) using only Vim: `plugin/tagsgen.vim`
+holds a table of definition patterns per filetype (C/C++, Rust, Python, Go, JavaScript, Lua, Vim script, shell, PowerShell,
+batch, MATLAB, Scheme/Racket/Lisp, Typst, Lean, TeX, Markdown headings) and
 `autoload/tagsgen.vim` does the scanning. Entries use ctags' search-pattern
 form, so `:tag`, `CTRL-]`, and `:tselect` work as usual and survive line
 shifts. It is regex based: no scopes or overload resolution, and the odd

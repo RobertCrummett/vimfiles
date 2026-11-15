@@ -41,8 +41,8 @@ file is missing, the first completion attempt says so.
 3. Why not the 'thesaurus' option                              *thesaurus-why*
 
 Vim's built-in handling of 'thesaurus' rescans the whole file on every
-completion and truncates lines longer than 510 bytes. Moby lines run past
-3,600 bytes, so most entries would lose the majority of their synonyms.
+completion and truncates lines longer than 510 bytes. Moby lines run to
+12,000 bytes, so most entries would lose the majority of their synonyms.
 Loading the file once into a dictionary keyed by headword avoids both
 problems.
 

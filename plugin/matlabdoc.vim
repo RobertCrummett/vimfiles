@@ -12,13 +12,15 @@
 " lookup, so it is run once: matlab/build_index.m walks every function in
 " matlabroot/help/matlab/helpfuncbycat.xml and writes its help text to
 " matlab/index/. A lookup is then a file read. Names the index misses -
-" your own functions, mostly - fall back to "matlab -batch help {name}" in a
-" background job, cached for the session.
+" your own functions, mostly - are asked of the warm matlabserver session if
+" there is one, and otherwise fall back to "matlab -batch help {name}" in a
+" background job; either answer is cached for the session.
 "
 " The index is generated, so .gitignore keeps it out of the history; the
 " generator itself is tracked. Rebuild it after a Matlab upgrade.
 "
 " g:matlabdoc_program overrides which matlab.exe to run.
+" g:matlabdoc_session_timeout  how long to wait for the session, ms (5000)
 if exists('g:loaded_matlabdoc')
   finish
 endif

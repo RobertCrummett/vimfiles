@@ -2,10 +2,8 @@ if exists('b:current_syntax')
   finish
 endif
 
-" Report headings and the winning stack item.
+" The report heading and the mark on the winning stack item.
 syntax match synexploreTitle   /\%1l.*/
-syntax match synexploreItem    /^\d\+\. \S\+/ " contains=synexploreItemNum
-" syntax match synexploreItemNum /^\d\+\./ contained
 syntax match synexploreApplies /<== applies/
 
 " Labels that start a line ("link chain:", "on screen:", "set from:", ...).
@@ -24,7 +22,6 @@ syntax match synexploreArrow   / -> /
 syntax match synexploreOwner   /\[\%(yours\|runtime\|default\|other\)\]$/
 
 highlight default link synexploreTitle   Title
-" highlight default link synexploreItemNum Number
 highlight default link synexploreApplies WarningMsg
 highlight default link synexploreLabel   Statement
 highlight default link synexploreSource  Comment

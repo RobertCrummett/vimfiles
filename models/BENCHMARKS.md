@@ -73,7 +73,7 @@ what quantization costs. It does not affect the 14B against 7B result.
 ## The laptop, 2026-09-07
 
 Run on the RTX 4050 Laptop GPU, llama.cpp build 7170 (Vulkan), all layers on
-the GPU, 8k context, flash attention on -- the arguments `plugin/llm.vim`
+the GPU, 8k context, flash attention on -- the arguments `autoload/llm.vim`
 itself passes. The original harness was not tracked, so the cases were rebuilt
 to the same recipe: 99 masked line tails from `autoload/*.vim`,
 `plugin/comments.vim` and `spell/geophysics/fetch-corpus.py`, with the prefix

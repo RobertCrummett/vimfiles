@@ -226,7 +226,7 @@ function! llm#set_model(name) abort
   if !empty(s:found)
     echo 'llm: model set to ' . a:name . ', for when mathterm has none on'
   elseif s:state ==# 'ready' || s:state ==# 'starting'
-    call llm#stop()
+    call llm#stop(1)
     echo 'llm: model set to ' . a:name . '; the server restarts on the next completion'
   else
     echo 'llm: model set to ' . a:name
@@ -310,17 +310,6 @@ function! s:server_exe() abort
   return ''
 endfunction
 
-" The full command the server is (or would be) started with; shown by
-" :LlmStatus and handy when a start fails.
-function! llm#command() abort
-  let l:exe = s:server_exe()
-  let l:model = llm#model_path(s:model_name())
-  if empty(l:exe) || empty(l:model)
-    return []
-  endif
-  return watchdog#wrap(s:server_cmd(l:exe, l:model))
-endfunction
-
 " g:llm_slots prompt caches of g:llm_ctx tokens each; the server's total
 " context is the product. One is the default: with two, requests from a
 " single Vim sometimes stalled for seconds when the server ran two
@@ -384,6 +373,7 @@ endfunction
 " than one device the model is pinned to one: the device g:llm_device
 " names, or by default the one that does not look integrated.
 function! s:device_args(exe) abort
+  let s:device = []
   let l:want = s:opt('device', '')
   if l:want ==# 'all'
     return []
@@ -536,6 +526,11 @@ function! s:when_free(Fn) abort
 endfunction
 
 function! s:slots_seen(Fn, reply) abort
+  " Stopped (:LlmStop, :LlmModel) while the question was out: the answer is
+  " about a server no longer in use, and there is nothing to ask of it.
+  if empty(s:found) || s:state !=# 'external'
+    return
+  endif
   if get(a:reply, 'body', '') =~# '"is_processing"\s*:\s*true'
     let s:last = {'outcome': 'busy'}
     let s:pending = []
@@ -667,11 +662,9 @@ function! s:http_finish(r, result) abort
   call a:r.Cb(a:result)
 endfunction
 
-" Ask the server's /health endpoint; Cb(1) if it says ok, Cb(0) otherwise
-" (including when nothing is listening).
-" Cb('ok') when a server answers and is ready, Cb('loading') when one
-" answers but is not (llama-server listens while the weights load),
-" Cb('down') when nothing answers.
+" Ask the server's /health endpoint: Cb('ok') when a server answers and is
+" ready, Cb('loading') when one answers but is not (llama-server listens
+" while the weights load), Cb('down') when nothing answers.
 function! s:health(Cb) abort
   call s:http('GET', '/health', '', {r -> a:Cb(has_key(r, 'error') ? 'down'
     \ : get(r, 'status', 0) == 200 && get(r, 'body', '') =~# '"ok"' ? 'ok' : 'loading')}, 2000)
@@ -739,12 +732,6 @@ function! s:start_after_probe(health) abort
     return
   endif
   let l:exe = s:server_exe()
-  if empty(l:exe)
-    let s:state = 'stopped'
-    let s:pending = []
-    call s:error('llm: llama-server not found; install llama.cpp (winget install ggml.llamacpp) or set g:llm_server')
-    return
-  endif
   let l:model = llm#model_path(s:model_name())
   let l:cmd = s:server_cmd(l:exe, l:model)
   let s:log = ['llm: ' . join(l:cmd, ' ')]
@@ -756,6 +743,7 @@ function! s:start_after_probe(health) abort
     \ })
   if job_status(s:job) !=# 'run'
     let s:state = 'stopped'
+    let s:job = v:null
     let s:pending = []
     call s:error('llm: could not start ' . l:exe)
     return
@@ -829,9 +817,11 @@ function! s:log_cb(channel, msg) abort
 endfunction
 
 function! s:exit_cb(job, status) abort
-  " A server stopped by :LlmStop or :LlmModel reports its exit after the
-  " next one may already be starting; that report is not about this state.
-  if s:job isnot v:null && a:job isnot s:job
+  " A server stopped by :LlmStop or :LlmModel, or because mathterm has a
+  " model on, reports its exit after llm#stop() has let go of it, and the
+  " next one may already be starting or a mathterm model being asked; that
+  " report is not about this state.
+  if a:job isnot s:job
     return
   endif
   if s:state !=# 'stopped'
@@ -891,17 +881,22 @@ function! llm#reset_last() abort
   let s:last = {}
 endfunction
 
+let s:log_buf = -1
 function! llm#log() abort
-  " Reuse the window a previous :LlmLog left open; naming a second buffer
-  " [LlmLog] while the first is still shown would fail with E95.
-  let l:win = bufwinnr('[LlmLog]')
-  if l:win > 0
-    execute l:win . 'wincmd w'
+  " Reuse the window a previous :LlmLog left open, in whichever tab; naming
+  " a second buffer [LlmLog] while the first is still shown would fail with
+  " E95. The window is found by buffer number: as a name, [LlmLog] is a
+  " pattern that matches any buffer with one of those letters in its name,
+  " and the log was then written over a file.
+  let l:wins = win_findbuf(s:log_buf)
+  if !empty(l:wins)
+    call win_gotoid(l:wins[0])
     setlocal modifiable
   else
     keepalt new
     setlocal buftype=nofile bufhidden=wipe noswapfile nobuflisted
     execute 'silent keepalt file' fnameescape('[LlmLog]')
+    let s:log_buf = bufnr('%')
   endif
   silent %delete _
   call setline(1, empty(s:log) ? ['(no server output yet)'] : s:log)
@@ -1186,7 +1181,6 @@ function! s:warm_now() abort
 endfunction
 
 function! s:warm_done(resp) abort
-  let l:t = get(a:resp, 'timings', {})
   let s:last.outcome = 'warm'
   call s:say(printf('llm: warm in %.1f s; %d context tokens cached (%d were already)',
     \ get(s:last, 'total_ms', 0.0) / 1000, get(s:last, 'total', 0), get(s:last, 'cached', 0)))

@@ -20,6 +20,7 @@
 " what plugin/matlabdebug.vim debugs at.
 "
 " g:matlabserver_port    port to listen on (51763)
+" g:matlabserver_idle    seconds of quiet before the session closes itself (1800)
 " g:matlabserver_timeout how long to wait for a reply, ms (60000)
 " g:matlabserver_start_timeout  how long :MatlabMake waits for a session (30000)
 " g:matlabserver_make_abbrev    let typed :make mean :MatlabMake (1)
@@ -48,8 +49,8 @@ command! -bar -bang    MatlabMake   call matlabserver#make(<bang>0)
 " Matlab buffer, so :make elsewhere, :makeprg and the like are untouched, and
 " what ran is visible on the command line rather than hidden. A :make from a
 " script or a mapping is not abbreviated and falls to 'makeprg', which
-" compiler/matlab.vim points at matlab -batch: correct, and slow, and needing
-" no session.
+" compiler/matlab.vim points at matlab -batch: slow, needing no session, and
+" with nothing for the quickfix list, since matlab -batch names no files.
 "
 " Set g:matlabserver_make_abbrev to 0 to keep :make literal.
 if get(g:, 'matlabserver_make_abbrev', 1)

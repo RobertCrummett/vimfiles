@@ -11,9 +11,6 @@ packadd! matchit
 
 set nowrap sidescroll=5
 
-set noerrorbells
-set novisualbell
-set t_vb=
 set belloff=all
 
 set wildmenu
@@ -33,8 +30,7 @@ endif
 
 set timeout timeoutlen=3000 ttimeoutlen=100
 
-colorscheme custom
-
+" Defined before the first :colorscheme, so they apply to it too.
 augroup colorscheme_modifications
   au!
   " color scheme morning
@@ -45,12 +41,7 @@ augroup colorscheme_modifications
   au Colorscheme evening highlight EndOfBuffer ctermfg=153 ctermbg=0 guifg=#add8e6 guibg=#000000
 augroup END
 
-" This check is inserted in case that someone (me) sets a color scheme before
-" the colorscheme_modifications apply. So this conditional ensures that the
-" order of calling colorscheme and defining the autocommand do not matter.
-if exists('g:colors_name')
-  execute 'colorscheme' g:colors_name
-endif
+colorscheme custom
 
 if has('extra_search')
   set hlsearch incsearch
@@ -135,7 +126,6 @@ endif
 
 if has("gui_running")
   set guioptions-=T go-=e go-=m go-=r go-=R go-=l go-=L
-  set t_Co=256
   if has("gui_win32")
     set guifont=Consolas:h15
 
@@ -163,7 +153,10 @@ endfunction
 
 augroup restart_editing_in_context
   autocmd!
-  au BufReadPost * if line("'\"") > 1 && line("'\"") <= line("$") | exe "normal! g'\"" | endif
+  " Not in a commit message: git reuses the file name, and the place the
+  " cursor was in the last message means nothing in this one.
+  au BufReadPost * if line("'\"") > 1 && line("'\"") <= line("$") && &ft !~# 'commit\|rebase'
+        \ | exe "normal! g`\"" | endif
 augroup END
 
 " The current directory follows the buffer the cursor is in: a file's own

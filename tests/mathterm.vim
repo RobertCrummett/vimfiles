@@ -128,6 +128,17 @@ function! s:run() abort
   call s:warm()
   call s:is('second request', s:paths(), ['/slots', '/completion'])
 
+  " Stopped while the look at the slots is out: nothing more is asked, and
+  " nothing is said.
+  call llm#reset_last()
+  call delete(s:log)
+  messages clear
+  LlmWarm
+  call llm#stop(1)
+  sleep 500m
+  call s:is('stopped meanwhile', s:paths(), ['/slots'])
+  call s:is('stopped meanwhile, nothing said', execute('messages') =~# 'llm:', 0)
+
   " The helper goes: the model is next, seen on the next request.
   call s:window('on', 'off: stopped when asked')
   call llm#reset_last()

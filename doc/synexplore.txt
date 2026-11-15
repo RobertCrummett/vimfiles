@@ -30,8 +30,7 @@ autoload/synexplore.vim.
                         can override all of that are listed too. Move the
                         cursor and run it again for another spot.
 
-:SynCursor!             Echo a short form of the same report instead of
-                        opening a window.
+:SynCursor!             Echo the same report instead of opening a window.
 
                                                                   *:SynGroup*
 :SynGroup {group}       One highlight group: its link chain, the attributes
@@ -43,7 +42,8 @@ autoload/synexplore.vim.
                         the pattern [pat] (case-insensitive), one per line:
                         the name, a sample drawn in that group, its own link
                         or attributes, the colour on screen, and its source
-                        tagged `[yours]`, `[runtime]` or `[default]`.
+                        tagged `[yours]`, `[runtime]`, `[default]` or, for a
+                        file outside vimfiles and the runtime, `[other]`.
 
                                                                   *:SynRules*
 :SynRules               The syntax rules in effect for the current buffer,

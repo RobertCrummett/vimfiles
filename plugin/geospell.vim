@@ -28,4 +28,10 @@ command! -bar                            GeoSpellAccept  call geospell#accept()
 command! -bar                            GeoSpellStats   call geospell#stats()
 
 " Rebuild the dictionary when the lists are newer than it (or it is missing).
-call geospell#build_if_stale()
+" Asked here and not in the autoload file, so that a start with nothing to
+" build costs three getftime() calls and reads no more script.
+let s:dir = expand('<sfile>:p:h:h') . '/spell/geophysics'
+if max([getftime(s:dir . '/words.txt'), getftime(s:dir . '/reject.txt')]) > getftime(s:dir . '.utf-8.spl')
+  call geospell#build(1)
+endif
+unlet s:dir

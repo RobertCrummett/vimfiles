@@ -3,8 +3,6 @@
 
 compiler typst
 
-setlocal nojoinspaces
-
 " The runtime file does fo+=croqn, putting back the c that vimrc's fo-=tc
 " removed. The flags come off one at a time: fo-=tc only matches a
 " contiguous "tc", which croqn does not contain.
@@ -20,4 +18,4 @@ setlocal formatlistpat=^\\s*\\d\\+\\.\\s\\+\\\|^\\s*[-+/]\\s\\+
 setlocal iskeyword+=-
 
 let b:undo_ftplugin = (empty(get(b:, 'undo_ftplugin', '')) ? '' : b:undo_ftplugin . ' | ')
-  \ . 'setlocal joinspaces< iskeyword< formatoptions< formatlistpat<'
+  \ . 'setlocal iskeyword< formatoptions< formatlistpat<'

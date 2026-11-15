@@ -6,7 +6,7 @@
 "
 "   :LlmWarm          start the server and prime it with this buffer
 "   :LlmStart :LlmStop :LlmStatus :LlmLog
-"   :LlmModel [name]  :LlmModels  :LlmDownload {name}
+"   :LlmModel [name]  :LlmModels  :LlmDownload {name}  :LlmDevices
 "
 " The server (llama-server) is started in the background on the first
 " completion, never at startup, and stops when Vim exits or dies. A model
@@ -40,5 +40,7 @@ endif
 
 augroup llm_plugin
   autocmd!
-  autocmd VimLeavePre * call llm#stop(1)
+  " Only when the plugin was used: calling llm#stop() outright would load
+  " all of autoload/llm.vim at every exit just to find nothing to stop.
+  autocmd VimLeavePre * if exists('*llm#stop') | call llm#stop(1) | endif
 augroup END

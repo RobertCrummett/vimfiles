@@ -20,6 +20,8 @@ plugin/geospell.vim and autoload/geospell.vim.
 
 spell/geophysics/words.txt      The vocabulary, one word per line. Tracked.
                                 Sorted on every write; `#` starts a comment.
+                                A write by the commands keeps the comment
+                                block at the top and no comment below it.
 spell/geophysics/reject.txt     Words that must never be included, even if
                                 a harvest finds them again. Tracked.
 spell/geophysics/fetch-corpus.py

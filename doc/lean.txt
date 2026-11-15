@@ -131,7 +131,9 @@ These are ordinary |:inoremap| mappings, local to the buffer. Where one name
 begins another (\l and \le, \to and \top) Vim waits for the next key to tell
 them apart, which in practice is the space or bracket typed anyway. No name
 is a string escape, so "a\n" types as written, which is why × is \times and
-↑ is \up. A backslash that must not start a symbol is typed |i_CTRL-V| \.
+↑ is \up. An escape with letters straight after it can still spell a name:
+"\next" comes out as "≠xt" and "\told" as "→ld". A backslash that must not
+start a symbol is typed |i_CTRL-V| \.
 
 ==============================================================================
 4. Colours                                                      *lean-syntax*
@@ -173,8 +175,9 @@ character, so h' is one word to |star| and |w|. |%| matches ⟨ ⟩ and ⟦ ⟧.
 Set these in the vimrc.
 
 							  *g:lean_goal_auto*
-g:lean_goal_auto	1 to open the goal window with the first Lean buffer,
-			and so start a server for it. Default 0.
+g:lean_goal_auto	1 to open the goal window whenever a Lean buffer is
+			loaded and it is not open, and so start a server for
+			it. Default 0.
 
 						      *g:lean_goal_position*
 g:lean_goal_position	"right" or "below". Default: right when Vim is 130

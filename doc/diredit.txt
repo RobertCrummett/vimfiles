@@ -137,7 +137,8 @@ Re-entering an unmodified listing re-reads the directory.
 R               Re-read the directory and draw the listing again.
                 Unwritten edits are discarded.
 g.              Toggle dotfiles.
-gl              Toggle the details column.
+gl              Toggle the details column. Both toggles draw the listing
+                again, so they too discard unwritten edits.
 g?              Show this key summary.
 
 ==============================================================================

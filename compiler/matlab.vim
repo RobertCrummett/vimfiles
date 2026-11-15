@@ -1,12 +1,13 @@
-" 'errorformat' for the file:line: message lines matlab/server.m reports, and
-" a 'makeprg' that runs a file without needing a session.
+" 'errorformat' for the file:line: message lines matlab/vimserver.m reports,
+" and a 'makeprg' that runs a file without needing a session.
 "
 " The fast path does not come through here. Typing :make in a Matlab buffer
 " runs :MatlabMake, which sends the file down the socket to the warm session
 " and reads the reply with :cgetexpr, in Vimscript, with nothing to install.
 " 'makeprg' is what a :make from a script or a mapping falls back to, and what
-" runs when the abbreviation is turned off: correct, needing no session, and
-" paying Matlab's five second startup every time.
+" runs when the abbreviation is turned off: needing no session, paying
+" Matlab's five second startup every time, and showing the errors without
+" putting them in the quickfix list (see the note at 'errorformat' below).
 "
 " Set by after/ftplugin/matlab.vim. See |matlabserver-make|.
 if exists("current_compiler")
@@ -36,13 +37,17 @@ let s:matlab = substitute(s:matlab, '\\', '/', 'g')
 execute 'CompilerSet makeprg='
   \ . escape('"' . s:matlab . '" -batch "cd(''%:p:h:gs?\\?/?''); %:t:r"', ' \|"')
 
-" Runtime errors come as file:line: message, parse errors (which server.m
-" resolves from Matlab's "File: x.m Line: 2 Column: 5" wording) with the
-" column as well. Anything that is not an error is Matlab's own output:
-" shown by :make, kept out of :clist. An error with no stack at all, raised
-" from the command line rather than inside a file, still gets an entry, but
-" Vim marks an entry with no file and no line invalid, so :clist hides it
-" (:clist! shows it) and :MatlabMake falls back to the output window.
+" The shape of the lines vimserver.m writes: runtime errors as file:line:
+" message, parse errors (which it resolves from Matlab's "File: x.m Line: 2
+" Column: 5" wording) with the column as well, and an error with no stack at
+" all, raised from the command line rather than inside a file, as Error:
+" message. Anything else is Matlab's own output and is kept out of the list.
+"
+" Two things to know before leaning on it. :MatlabMake does not read it:
+" :cgetexpr takes the global 'errorformat', never the buffer's; see
+" matlabserver#finish_run(). And 'makeprg' does not print this shape: matlab
+" -batch reports "Error in helper (line 2)", a function and no file, so a
+" plain :make shows the output and leaves the quickfix list empty.
 CompilerSet errorformat=%f:%l:%c:\ %m,%f:%l:\ %m,Error:\ %m,%-G%.%#
 
 unlet s:matlab

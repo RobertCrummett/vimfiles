@@ -233,8 +233,9 @@ endfunction
 function! s:props_at(lnum, col) abort
   let l:found = []
   for l:p in exists('*prop_list') ? prop_list(a:lnum) : []
-    " A property with no text of its own (virtual text aside) covers nothing.
-    if !has_key(l:p, 'type') || a:col < l:p.col || a:col >= l:p.col + l:p.length
+    " A property with no text of its own covers nothing, and neither does
+    " virtual text, which has no length at all.
+    if !has_key(l:p, 'type') || a:col < l:p.col || a:col >= l:p.col + get(l:p, 'length', 0)
       continue
     endif
     let l:t = prop_type_get(l:p.type, {'bufnr': bufnr()})
@@ -395,7 +396,8 @@ function! synexplore#highlights(pattern) abort
     let l:owner = empty(l:e.file) ? 'default' : (l:editable ? 'yours' : (l:label =~# 'runtime' ? 'runtime' : 'other'))
     let l:line = printf('%-32s xxx  %-48s | %s | %s [%s]', l:e.name, l:e.desc, s:effective(l:e.name), l:src, l:owner)
     call add(l:lines, l:line)
-    call add(l:samples, [l:e.name, len(l:lines), 34, 3])
+    " The sample is the xxx, which a name wider than its column pushes right.
+    call add(l:samples, [l:e.name, len(l:lines), max([len(l:e.name), 32]) + 2, 3])
   endfor
   call s:scratch('SynHighlights', l:lines, l:samples)
 endfunction
@@ -420,15 +422,9 @@ function! synexplore#rules(group) abort
     \ '    override the colour',
     \ '']
   if empty(a:group)
-    let l:out = execute('verbose syntax list', 'silent!')
-    for l:l in split(l:out, "\n")
-      if l:l =~# 'Last set from'
-        let [l:file, l:lnum] = s:last_set(l:l)
-        call add(l:lines, '    ' . substitute(s:source_line(l:file, l:lnum), '^set from', 'rule from', ''))
-      else
-        call add(l:lines, l:l)
-      endif
-    endfor
+    " As Vim lists them, without sources: it keeps none for a syntax rule,
+    " and finding them as s:rule_sources() does is for one group at a time.
+    call extend(l:lines, split(execute('syntax list', 'silent!'), "\n"))
   else
     call add(l:lines, 'Rule ' . a:group . ':')
     call extend(l:lines, s:rule_lines(a:group, ''))

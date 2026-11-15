@@ -252,10 +252,10 @@ function! matlabserver#stop() abort
   endif
   if l:job isnot v:null && job_status(l:job) ==# 'run'
     if l:asked
-      " Matlab leaves by itself once it reads the quit, a second or two of
-      " JVM teardown later; nobody waits for that. Only a session too busy
-      " to read it is cut off, so that a :MatlabStart meanwhile finds the
-      " port free.
+      " Matlab leaves by itself once it reads the quit, four or five
+      " seconds of teardown later; nobody waits for that. A session too
+      " busy to read it is cut off, so that a :MatlabStart meanwhile finds
+      " the port free.
       call timer_start(5000, {-> job_status(l:job) ==# 'run' ? job_stop(l:job, 'kill') : 0})
     else
       call job_stop(l:job, 'kill')
@@ -472,12 +472,15 @@ function! s:show(title, res) abort
   setlocal modifiable noreadonly
   let b:matlabserver_out = 1
   let l:n = 0
-  " :file expands wildcards, and an expression with a * in it made it
-  " fail with "No match".
-  let l:try = '[' . substitute(a:title, '[*?]', '_', 'g') . ']'
+  " :file expands its argument as a file name, and fnameescape() cannot
+  " protect these on Windows, where a backslash is a path separator: an
+  " expression with a *, a <, a | or a double quote in it made :file fail
+  " with "No match", and the output was never shown.
+  let l:title = substitute(a:title, '[*?"<>|{}$]', '_', 'g')
+  let l:try = '[' . l:title . ']'
   while bufexists(l:try)
     let l:n += 1
-    let l:try = '[' . a:title . ' ' . l:n . ']'
+    let l:try = '[' . l:title . ' ' . l:n . ']'
   endwhile
   execute 'silent keepalt file' fnameescape(l:try)
   let l:lines = empty(a:res.lines) ? ['(no output)'] : a:res.lines
@@ -546,8 +549,10 @@ function! matlabserver#run() abort
   call matlabserver#report('Matlab run ' . l:name, l:res)
 endfunction
 
-" Leaving Vim would kill the session anyway; asking it to quit first lets
-" Matlab shut down in its own time rather than being cut off mid-write.
+" Leaving Vim kills the session anyway. The quit sent first was meant to let
+" Matlab shut down in its own time rather than be cut off mid-write, but
+" that takes it four or five seconds and Vim's job teardown follows within
+" half a second, so as things stand the session is cut off all the same.
 augroup matlabserver_exit
   autocmd!
   autocmd VimLeavePre * if matlabserver#running() | call matlabserver#stop() | endif
@@ -614,29 +619,35 @@ function! matlabserver#finish_run(name, res, bang) abort
     call matlabserver#report('Matlab make ' . a:name, a:res)
     return
   endif
-  " cgetexpr reads the current buffer's 'errorformat', which compiler/matlab.vim
-  " set for matlab buffers, against the file:line: message lines the session
-  " produces. Reached from a callback the current buffer may be another one,
-  " so the format is named outright.
-  let l:save = &errorformat
+  " :cgetexpr reads the global 'errorformat' and never the buffer's, so what
+  " compiler/matlab.vim set is not what is used here: in a matlab buffer the
+  " file:line: message lines the session produces are matched by the stock
+  " %f:%l:%m patterns. Reached from a callback the current buffer may be
+  " another one, and there the format is named outright. It is the global
+  " value that is set and put back: through plain &errorformat a buffer's
+  " own value was dropped and then restored into the global one.
+  let l:save = &g:errorformat
   if &filetype !=# 'matlab'
-    let &errorformat = '%f:%l:%c: %m,%f:%l: %m,Error: %m,%-G%.%#'
+    let &g:errorformat = '%f:%l:%c: %m,%f:%l: %m,Error: %m,%-G%.%#'
   endif
   try
     cgetexpr a:res.lines
   finally
-    let &errorformat = l:save
+    let &g:errorformat = l:save
   endtry
   " Lines that matched no format are kept as invalid entries (:clist! shows
   " them); only the ones with a position count, and without any of those
   " the output window says more than an empty :clist would.
-  let l:n = len(filter(getqflist(), 'v:val.valid'))
+  let l:list = getqflist()
+  let l:n = len(filter(copy(l:list), 'v:val.valid'))
   if l:n == 0
     call matlabserver#report('Matlab make ' . a:name, a:res)
     return
   endif
   if !a:bang
-    cfirst
+    " Not :cfirst: entry 1 is whatever the file printed before it raised,
+    " and :cfirst goes to that line of output and so nowhere.
+    execute 'cc' indexof(l:list, 'v:val.valid') + 1
   endif
   redraw
   echo printf('matlabserver: %s raised, %d quickfix entr%s (:clist)',
