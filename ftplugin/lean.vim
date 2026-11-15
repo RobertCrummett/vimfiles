@@ -45,7 +45,7 @@ endif
 let b:undo_ftplugin = 'setlocal commentstring< comments< formatoptions< shiftwidth<'
   \ . ' softtabstop< expandtab< iskeyword< matchpairs< suffixesadd< include<'
   \ . ' includeexpr< path< makeprg< errorformat<'
-  \ . ' | unlet! b:lean_root | call lean#unmap()'
+  \ . ' | unlet! b:lean_root b:current_compiler | call lean#unmap()'
   \ . ' | silent! nunmap <buffer> <LocalLeader>g'
 
 let &cpo = s:save_cpo

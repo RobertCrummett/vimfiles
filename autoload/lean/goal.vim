@@ -200,7 +200,7 @@ function! s:server(bufnr) abort
     let s:shown.note = s:dead[l:key]
     return {}
   endif
-  let l:server = {'key': l:key, 'ready': 0, 'docs': {}, 'uris': {}, 'stderr': [], 'stopping': 0}
+  let l:server = {'key': l:key, 'ready': 0, 'docs': {}, 'uris': {}, 'stderr': []}
   let l:server.job = job_start(l:command, {
     \ 'in_mode': 'lsp', 'out_mode': 'lsp', 'err_mode': 'nl', 'cwd': l:cwd, 'noblock': 1,
     \ 'out_cb': function('s:incoming', [l:key]),
@@ -278,7 +278,8 @@ function! s:stderr(key, channel, line) abort
 endfunction
 
 " A server that stops by itself is not started again by the next cursor
-" movement: if it cannot run it would be started on every one of them.
+" movement: if it cannot run it would be started on every one of them. One
+" stopped by lean#goal#stop() is out of s:servers by now and is not reported.
 function! s:exited(key, job, status) abort
   if !has_key(s:servers, a:key) || s:servers[a:key].job isnot a:job
     return
@@ -287,9 +288,6 @@ function! s:exited(key, job, status) abort
   for l:bufnr in keys(l:server.docs)
     silent! call remove(s:diagnostics, l:bufnr)
   endfor
-  if l:server.stopping
-    return
-  endif
   let s:dead[a:key] = join(['The Lean server stopped (exit ' . a:status . '). :LeanRestart starts it again.']
     \ + l:server.stderr[-8:], "\n")
   if s:key(s:shown.bufnr) ==# a:key
@@ -300,7 +298,6 @@ endfunction
 
 function! lean#goal#stop() abort
   for l:server in values(s:servers)
-    let l:server.stopping = 1
     call s:send(l:server, {'method': 'shutdown'}, {'callback': {-> 0}})
     call s:send(l:server, {'method': 'exit'})
     silent! call job_stop(l:server.job)
@@ -317,9 +314,13 @@ function! lean#goal#restart() abort
 endfunction
 
 " Tell the server what the buffer holds now: all of it, when it has changed
-" since the server was last told.
+" since the server was last told. Most calls are a cursor movement over
+" text the server already has, and those must not pay for joining the buffer.
 function! s:sync(server, bufnr) abort
   let l:tick = getbufvar(a:bufnr, 'changedtick')
+  if get(get(a:server.docs, a:bufnr, {}), 'tick', -1) == l:tick
+    return a:server.docs[a:bufnr]
+  endif
   let l:text = join(getbufline(a:bufnr, 1, '$'), "\n") . "\n"
   if !has_key(a:server.docs, a:bufnr)
     let l:doc = {'uri': s:uri(bufname(a:bufnr)), 'version': 1, 'tick': l:tick}
