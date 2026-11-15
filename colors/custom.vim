@@ -1,6 +1,6 @@
 " Name:         custom
 " Description:  Vim's bundled "quiet" colorscheme (mostly monochrome) plus
-"               three accents used consistently across languages.
+"               five accents used consistently across languages.
 " Based on:     colors/quiet.vim by Maxence Weynans (Vim License)
 "
 " Everything up to the "Custom accents" section is copied from quiet.vim so
@@ -12,7 +12,7 @@ let g:colors_name = 'custom'
 " Applied after quiet's definitions, just before each of its "finish" exits.
 function! s:Accents() abort
   "
-  " quiet colours only comments, so three accents carry all the meaning:
+  " quiet colours only comments, so five accents carry all the meaning:
   "   customLavendar     functions, calls, definitions (help entries, vim commands)
   "   customLightPurple  special characters, math, options, key notation
   "   customPink         labels, references, links, jumps
@@ -64,6 +64,10 @@ function! s:Accents() abort
   hi! link typstCodeIdentifier     customLavendar
   hi! link typstCodeFunction       customLavendar
   hi! link typstCodeFieldAccess    customLavendar
+  " Strings in code: the "a.png" of #image("a.png"), a font name, a caption
+  " given as a string. Upstream has them on String, which quiet leaves plain,
+  " so they read as prose. A string inside math stays the colour of the math.
+  hi! link typstCodeString         customLightPink
   hi! link typstMarkupDollar       customLightPurple
   " The $ delimiters themselves (group defined in after/syntax/typst.vim),
   " and math inside code mode and after #, which the bundled syntax leaves
