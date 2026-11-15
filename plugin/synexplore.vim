@@ -6,7 +6,7 @@
 "                          the rule text, and where every piece was set;
 "                          then the text properties and the spelling mark
 "                          drawn over it
-"                          (! opens it in a buffer instead of echoing)
+"                          (! echoes it instead of opening a buffer)
 "   :SynGroup {group}      one highlight group: link chain, colours, source
 "   :SynHighlights [pat]   every highlight group (matching pat), with a
 "                          coloured sample, its link/attributes, and source
@@ -20,7 +20,7 @@ if exists('g:loaded_synexplore')
 endif
 let g:loaded_synexplore = 1
 
-" :SynCursor opens a report buffer; :SynCursor! only echoes the stack.
+" :SynCursor opens a report buffer; :SynCursor! echoes the same report.
 command! -bar -bang                        SynCursor     call synexplore#cursor(!<bang>0)
 command! -bar                              SynExplore    call synexplore#cursor(1)
 command! -bar -nargs=1 -complete=highlight SynGroup      call synexplore#group(<q-args>)
