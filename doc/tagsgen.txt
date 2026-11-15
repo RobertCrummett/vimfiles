@@ -98,8 +98,11 @@ tag name with |/\zs| and |/\ze|: >
       \ }
 <
 Every pattern runs over all the lines of a file in one |matchstrlist()|
-call, so there is nothing to gain from a cheaper prefilter. A third list
-element is accepted and ignored, so older entries keep working.
+call, so there is nothing to gain from a cheaper prefilter. A pattern is
+run by the backtracking regexp engine, as if it began with |/\%#=1|, which
+is the faster one for patterns of this kind; one that begins with `\%#=`
+keeps the engine it names. A third list element is accepted and ignored, so
+older entries keep working.
 
 ==============================================================================
 4. Options                                                   *tagsgen-options*
@@ -135,13 +138,16 @@ This is regular-expression tagging. There is no parser, so no scopes,
 overload resolution or nested definitions, and a line that looks like a
 definition is tagged even when it is not one. For jumping to definitions in
 your own code it is enough; for library-scale accuracy, ctags is still the
-better tool.
+better tool. A line gives at most one tag: the first pattern that matches
+it owns it, so the second `\label` on a line is not seen.
 
 Symbolic links and junctions are not followed, so a link back up the tree
 cannot send the walk round in circles, and a linked-in directory is not
 scanned.
 
 Measured on C sources, a scan takes about 0.4 to 1 second per hundred
-thousand lines, the denser the definitions the slower.
+thousand lines, the denser the definitions the slower. Vim script is
+lighter: the 1900 files and 310 000 lines of Vim's own runtime take a little
+over a second once the files are in the disk cache.
 
  vim:tw=78:ts=8:ft=help:norl:

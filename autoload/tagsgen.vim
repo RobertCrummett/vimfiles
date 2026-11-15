@@ -67,6 +67,14 @@ function! s:address(line) abort
   return '/^' . substitute(escape(a:line, '\/'), "\t", '\\t', 'g') . '$/;"'
 endfunction
 
+" A pattern with the regexp engine chosen for it, unless it names one itself:
+" the backtracking engine. On 340000 lines it gave the same matches as the
+" engine Vim picks by itself for every pattern in the table, and for most of
+" them in a half to a fifth of the time.
+function! s:engine(pat) abort
+  return a:pat =~# '^\\%#=' ? a:pat : '\%#=1' . a:pat
+endfunction
+
 " Tag lines for one file. "rel" is the path as written in the tags file.
 " Each pattern runs over all lines in one C-speed matchstrlist() call; the
 " first pattern (in table order) to match a line owns that line.
@@ -77,21 +85,27 @@ function! s:scan(path, rel, ft) abort
   catch
     return l:tags
   endtry
-  call map(l:lines, 'v:val =~# "\r$" ? v:val[:-2] : v:val')
+  " Only a file that has a carriage return to lose pays for the map(), which
+  " costs more than running a pattern does.
+  if match(l:lines, "\r$") >= 0
+    call map(l:lines, 'v:val =~# "\r$" ? v:val[:-2] : v:val')
+  endif
   " Lines the skip rule covers (comments) are blanked before the patterns
   " run. Folding the rule into each pattern as a lookahead instead made the
   " C function pattern five times slower.
   let l:skip = get(g:tagsgen_skip, a:ft, '')
   if !empty(l:skip)
-    for l:m in matchstrlist(l:lines, l:skip)
+    for l:m in matchstrlist(l:lines, s:engine(l:skip))
       let l:lines[l:m.idx] = ''
     endfor
   endif
   let l:taken = {}
   for l:entry in g:tagsgen_patterns[a:ft]
     let [l:pat, l:kind] = l:entry[0:1]
-    for l:m in matchstrlist(l:lines, l:pat)
-      if has_key(l:taken, l:m.idx) || empty(l:m.text)
+    for l:m in matchstrlist(l:lines, s:engine(l:pat))
+      " A name with a tab in it (a Markdown heading can have one) cannot be
+      " written: the tab would end the name field.
+      if has_key(l:taken, l:m.idx) || empty(l:m.text) || stridx(l:m.text, "\t") >= 0
         continue
       endif
       let l:taken[l:m.idx] = 1
