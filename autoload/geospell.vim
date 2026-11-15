@@ -64,7 +64,8 @@ endfunction
 
 " ------------------------------------------------------------------ build
 
-" Compile words.txt minus reject.txt into the .spl with :mkspell.
+" Compile words.txt minus reject.txt into the .spl with :mkspell. Also run
+" by plugin/geospell.vim at startup when the .spl is older than the lists.
 function! geospell#build(...) abort
   let l:quiet = a:0 && a:1
   let l:reject = {}
@@ -100,14 +101,6 @@ function! geospell#build(...) abort
     echomsg printf('geospell: %d words -> %s', len(l:words), fnamemodify(s:spl_file, ':~'))
   endif
   return 1
-endfunction
-
-" Build at startup when the .spl is missing or older than the lists.
-function! geospell#build_if_stale() abort
-  let l:newest = max([getftime(s:words_file), getftime(s:reject_file)])
-  if l:newest > 0 && (!filereadable(s:spl_file) || getftime(s:spl_file) < l:newest)
-    call geospell#build(1)
-  endif
 endfunction
 
 " ------------------------------------------------------------ add / remove

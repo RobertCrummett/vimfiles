@@ -39,8 +39,8 @@ function! s:synonyms(head) abort
   if empty(l:line)
     return []
   endif
-  let l:words = split(substitute(l:line, '\r$', '', ''), ',')
-  return l:words[1:]
+  " readfile() has already taken the CR off the file's CRLF line ends.
+  return split(l:line, ',')[1:]
 endfunction
 
 function! s:match_case(word, base) abort
