@@ -203,8 +203,9 @@ line the next time you |:Run|. The table is rebuilt from the signs of every
 loaded file before they are sent. A condition stays with its sign.
 
 Breakpoints are per file, whatever buffer they were set from. |:Clear|
-removes them one at a time; |:MatlabDebugClose| removes them all, and so
-does the session ending.
+removes them one at a time; |:MatlabDebugClose| removes them all. The
+session ending takes only the session's own with it: the signs and the
+table stay, and the next |:Run| sends them to the new session.
 
 Only line breakpoints are offered. `dbstop if error` and the rest can be
 set with |:Matlab|, and nothing here clears them. A stop from one of

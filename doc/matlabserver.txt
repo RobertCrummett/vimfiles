@@ -24,10 +24,11 @@ debugger, |matlabdebug|, is built on it.
 
                                                                *:MatlabStop*
 :MatlabStop             Send the session a quit and let Matlab leave in its
-                        own time. It is killed only if it is still running
-                        five seconds later, or at once if the quit could not
-                        be sent. Also run automatically when Vim exits,
-                        where Vim does not wait for it.
+                        own time, which is four or five seconds. It is
+                        killed if it is still running five seconds later,
+                        or at once if the quit could not be sent. Also run
+                        automatically when Vim exits, where Vim does not
+                        wait for it; see |matlabserver-idle|.
 
                                                              *:MatlabStatus*
 :MatlabStatus           Whether the session is up, the measured round trip,
@@ -125,7 +126,7 @@ debugger's windows. >
 Errors name the innermost frame first and each caller after, so :cnext walks
 out of the stack. A file that runs clean clears the quickfix list and shows
 whatever it printed instead. The first :make of a Vim session starts Matlab
-and takes about two seconds; every one after that is around 0.01 s.
+and takes about five seconds; every one after that is around 0.01 s.
 
 While it waits for a new session it tries the socket every 250 ms and
 counts up on the command line, "matlabserver: starting Matlab, 3 s ...",
@@ -134,10 +135,12 @@ meantime, through the idle timeout or a crash, is started again; if none
 comes up within |g:matlabserver_start_timeout| the make is abandoned with a
 pointer to matlab/server.log.
 
-after/ftplugin/matlab.vim runs `compiler matlab`, which is where the
-'errorformat' :MatlabMake reads comes from. Every .m file is a matlab buffer
-here: the vimrc sets g:filetype_m, so Vim's guess between matlab and octave
-from the file's contents is never made.
+after/ftplugin/matlab.vim runs `compiler matlab`, which sets 'makeprg' and
+'errorformat' for the buffer. :MatlabMake does not read that 'errorformat':
+|:cgetexpr| takes the global value, never the buffer's, and it is the stock
+`%f:%l:%m` patterns there that match the lines the session writes. Every .m
+file is a matlab buffer here: the vimrc sets g:filetype_m, so Vim's guess
+between matlab and octave from the file's contents is never made.
 
 The buffer is written first. :make on a stale file is a trap, and Vim's own
 answer to it, 'autowrite', is a global setting this should not turn on for
@@ -158,8 +161,10 @@ Set |g:matlabserver_make_abbrev| to 0 to keep :make literal.
 
 A :make from a script or a mapping is not abbreviated: abbreviations apply to
 typed input only. Those fall to 'makeprg', which compiler/matlab.vim points at
-`matlab -batch`. That is correct and needs no session, but pays Matlab's five
-second startup every time.
+`matlab -batch`. That runs the file and needs no session, but pays Matlab's
+five second startup every time, and its errors are shown without reaching the
+quickfix list: matlab -batch reports "Error in helper (line 2)", a function
+and no file, which no 'errorformat' can place.
 
 Note for anyone editing compiler/matlab.vim: the paths there are quoted by
 hand with forward slashes rather than through |shellescape()| and `%:p:S`.
@@ -169,8 +174,8 @@ backslashes of a Windows path as escapes and drops them, turning
 
 And for anyone editing the abbreviation: a bar in the right-hand side ends the
 command, so an expression containing "||" is stored truncated and fails with
-E110 every time it fires, taking the command line down with it. Hence index()
-over the two filetypes rather than an "or".
+E110 every time it fires, taking the command line down with it. The condition
+is written with "&&" alone for that reason.
 
 ==============================================================================
 4. When it closes                                          *matlabserver-idle*
@@ -201,10 +206,11 @@ process is gone, sends the session a quit over its socket, and kills the
 Matlab process tree if it is still there five seconds later. Leaving Vim
 normally ends the session through Vim's own job teardown; the watchdog is
 for the crash. Leaving Vim normally sends a quit through |VimLeavePre| as
-well, and does not wait for the answer: Matlab reads it and shuts down in
-its own time, a second or two of JVM teardown later, instead of being cut
-off mid-write. Killing Matlab outright is avoided where it can be: that is
-what brings up its crash reporter.
+well, and does not wait for the answer; but Matlab needs four or five
+seconds to shut down after a quit, and Vim's job teardown ends the whole
+process tree within half a second of leaving, so on this road the session
+is cut off all the same. Killing Matlab outright is avoided where it can
+be: that is what brings up its crash reporter.
 
 A client that gives up on a slow request does not end the session, and no
 longer closes the connection: the late reply is matched by its id and
@@ -233,7 +239,7 @@ diredit and synexplore are.
 
 Errors are reported as Matlab's message plus the frames from your own code,
 after whatever the command printed before it raised. The `evalin`, `evalc`
-and server.m frames that carry the command are dropped, as are warning
+and vimserver.m frames that carry the command are dropped, as are warning
 backtraces, the clickable `<a href="matlab:...">` markup Matlab writes for
 its own desktop, and the backspaces it pads warning text with. >
 
@@ -242,7 +248,7 @@ its own desktop, and the backspaces it pads warning text with. >
     C:\work\warnraise.m:3: bang 7
 <
 A parse error has no stack; Matlab puts the position in the message as
-"File: x.m Line: 2 Column: 5", which server.m turns into `path:2:5: message`
+"File: x.m Line: 2 Column: 5", which vimserver.m turns into `path:2:5: message`
 so it lands in the quickfix list like any other error. An error with no
 position at all is reported as `Error: message`.
 
@@ -251,6 +257,7 @@ that opens with `clear all`, or assigns to a name the session uses,
 therefore clears only your variables. The session's state is held by a
 locked object that `clear all` and `clear classes` leave alone, and the
 breakpoints survive both as well.
+
 ==============================================================================
 6. Settings                                            *matlabserver-settings*
 

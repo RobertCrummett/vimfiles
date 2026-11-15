@@ -4,7 +4,8 @@
 " of their own, and stepping is a command away.
 "
 "   :MatlabDebug          open the debugger: two windows, and the commands
-"   :MatlabDebugClose     close it; breakpoints are kept for next time
+"   :MatlabDebugClose     close it; a stopped run is abandoned and every
+"                         breakpoint is cleared
 "
 " While it is open, named after Vim's own termdebug:
 "
@@ -34,8 +35,12 @@ let g:loaded_matlabdebug = 1
 command! -bar MatlabDebug      call matlabdebug#open()
 command! -bar MatlabDebugClose call matlabdebug#close()
 
-" A file with breakpoints opened after they were set gets its signs.
+" A file with breakpoints opened after they were set gets its signs. Only
+" once the debugger has been used: exists() does not load the autoload file,
+" and until something else has there are no breakpoints to show, so reading
+" a .m file costs nothing.
 augroup matlabdebug
   autocmd!
-  autocmd BufReadPost *.m call matlabdebug#buffer_loaded()
+  autocmd BufReadPost *.m if exists('*matlabdebug#buffer_loaded')
+    \ | call matlabdebug#buffer_loaded() | endif
 augroup END

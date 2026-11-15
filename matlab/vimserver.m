@@ -177,6 +177,10 @@ methods
         S.server.socket().bind(java.net.InetSocketAddress( ...
             java.net.InetAddress.getByName('127.0.0.1'), port), 4);
         S.buf = java.nio.ByteBuffer.allocate(65536);
+        % No client yet either: the wait for the first one is on the idle
+        % clock like any other, or a session started and never spoken to
+        % would stay for good.
+        S.alone = tic;
         S.quiet = tic;
         S.tmr = timer('Name', 'matlabserver', 'Tag', 'matlabserver', ...
             'ExecutionMode', 'fixedSpacing', 'Period', vimserver.PERIOD, ...
@@ -248,7 +252,11 @@ methods
                 && toc(S.quiet) > S.idleSeconds;
         end
         if idle
-            disp(sprintf('server: idle for %g s; shutting down', S.idleSeconds));
+            % Nothing is written to the log here, though it was: with that
+            % line printed from this callback ("Error on flush" follows it
+            % in the log) the exit sent to the prompt next never ran, and
+            % the session sat there for good with its socket closed. Vim
+            % says why the session ended; see s:exited().
             S.finish();
         end
     end
@@ -299,13 +307,18 @@ methods
         if isempty(S.client)
             return
         end
+        % A client that hangs up is let go only after what it sent first
+        % has been queued: :MatlabStop and the watchdog both send their
+        % quit and close at once, so the line and the end of the stream
+        % are found on the same look.
+        gone = false;
         try
             for k = 1:64
                 S.buf.clear();
                 n = S.client.read(S.buf);
                 if n < 0
-                    S.hangup();                 % the client hung up
-                    return
+                    gone = true;                % the client hung up
+                    break
                 elseif n == 0
                     break
                 end
@@ -319,11 +332,14 @@ methods
         while true
             nl = find(S.pending == 10, 1);
             if isempty(nl)
-                return
+                break
             end
             line = native2unicode(S.pending(1:nl-1), 'UTF-8');
             S.pending = S.pending(nl+1:end);
             S.enqueue(line);
+        end
+        if gone
+            S.hangup();
         end
     end
 
@@ -390,11 +406,13 @@ methods
     end
 
     function dispatch(S)
-        if isempty(S.queue) || isempty(S.client)
+        if isempty(S.queue)
             return
         end
         % A quit is honoured whatever else is going on, so that a session
-        % wedged somewhere unforeseen can still be told to leave.
+        % wedged somewhere unforeseen can still be told to leave; and with
+        % no client left to answer, since whoever sent it has usually hung
+        % up already.
         for k = 1:numel(S.queue)
             if strcmp(S.queue{k}.kind, 'quit')
                 S.begin(S.queue{k}.id);
@@ -403,7 +421,7 @@ methods
                 return
             end
         end
-        if S.busy
+        if S.busy || isempty(S.client)
             return
         end
         req = S.queue{1};

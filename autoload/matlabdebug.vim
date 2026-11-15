@@ -201,14 +201,10 @@ function! s:open_windows() abort
   call win_gotoid(l:cur)
 endfunction
 
+" Wiping a buffer closes every window that shows it, in any tab.
 function! s:close_windows() abort
   for l:buf in [s:stackbuf, s:varsbuf]
     if l:buf > 0 && bufexists(l:buf)
-      for l:w in win_findbuf(l:buf)
-        if winnr('$') > 1
-          call win_execute(l:w, 'close')
-        endif
-      endfor
       execute 'silent! bwipeout!' l:buf
     endif
   endfor
@@ -392,9 +388,6 @@ function! matlabdebug#open() abort
   if !matlabserver#running()
     call matlabserver#start()
   endif
-  if empty(s:matlabroot)
-    call matlabserver#request('eval', 'disp(matlabroot)', function('s:got_matlabroot'))
-  endif
 endfunction
 
 " :MatlabDebugClose. A stopped run is abandoned, and every breakpoint goes:
@@ -532,6 +525,11 @@ function! matlabdebug#stopped(frames, frame, id) abort
   let s:stops += 1
   if !s:active
     call matlabdebug#open()
+  endif
+  " Asked at a stop and not when the debugger opens: a session :MatlabDebug
+  " has only just started is not listening yet, and the question was lost.
+  if empty(s:matlabroot)
+    call matlabserver#request('eval', 'disp(matlabroot)', function('s:got_matlabroot'))
   endif
   if a:id !=# '-' && a:id !=# s:run
     " Not our :Run (:make, :Matlab): whoever started it reports its end;
