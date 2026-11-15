@@ -4,7 +4,7 @@
 " half-written PDF or .aux behind, so one more build follows instead.
 
 let s:build = {}      " the running build, or empty
-let s:again = 0       " a :make came during it
+let s:again = []      " a :make came during it: what s:start() takes for it
 
 " 'statusline' can show this.
 function! bgmake#running() abort
@@ -20,12 +20,14 @@ function! bgmake#make(timer) abort
   if &modified
     silent update
   endif
+  let l:args = [expandcmd(&makeprg), &errorformat, getcwd(), bufnr('%')]
   if !empty(s:build)
-    let s:again = 1
+    " Of this buffer, which need not be the one that is being built.
+    let s:again = l:args
     echo 'make: one more build after this one'
     return
   endif
-  call s:start(expandcmd(&makeprg), &errorformat, getcwd(), bufnr('%'))
+  call call('s:start', l:args)
   if !empty(s:build)
     echo 'make: building'
   endif
@@ -37,7 +39,7 @@ endfunction
 
 function! s:start(cmd, efm, dir, buffer) abort
   let l:build = {'cmd': a:cmd, 'efm': a:efm, 'dir': a:dir, 'buffer': a:buffer,
-    \ 'lines': [], 'closed': 0, 'status': -1, 'started': reltime()}
+    \ 'lines': [], 'closed': 0, 'exited': 0, 'status': 0, 'started': reltime()}
   " The shell runs it, as for :make itself. 'shell' may carry its own quotes.
   let l:argv = [substitute(&shell, '^"\|"$', '', 'g'), &shellcmdflag, a:cmd]
   let l:build.job = job_start(l:argv, {'cwd': a:dir, 'in_io': 'null', 'err_io': 'out',
@@ -62,15 +64,18 @@ function! s:closed(build, channel) abort
 endfunction
 
 function! s:exited(build, job, status) abort
-  let a:build.status = a:status
+  " Not told by the status itself: one below zero is what "exit -1" gives on
+  " Windows, and a program that crashed.
+  let [a:build.exited, a:build.status] = [1, a:status]
   call s:finish(a:build)
 endfunction
 
 " Vim marks an entry with no file invalid, and :clist hides invalid entries:
 " TeX's "! message", which has no file, would never be seen. It is put on the
-" buffer that was built, so that :clist shows it and :cc goes there.
+" buffer that was built, so that :clist shows it and :cc goes there. (If it
+" is still there: setqflist() refuses the number of a buffer that was wiped.)
 function! s:entry(build, item) abort
-  if !a:item.bufnr
+  if !a:item.bufnr && bufexists(a:build.buffer)
     let a:item.bufnr = a:build.buffer
   endif
   let a:item.valid = 1
@@ -78,7 +83,7 @@ function! s:entry(build, item) abort
 endfunction
 
 function! s:finish(build) abort
-  if !a:build.closed || a:build.status < 0
+  if !a:build.closed || !a:build.exited
     return
   endif
   let s:build = {}
@@ -109,8 +114,8 @@ function! s:finish(build) abort
     echo 'make done (' . l:took . ')'
   endif
   call setqflist([], ' ', {'title': a:build.cmd, 'items': l:items})
-  if s:again
-    let s:again = 0
-    call s:start(a:build.cmd, a:build.efm, a:build.dir, a:build.buffer)
+  if !empty(s:again)
+    let [l:args, s:again] = [s:again, []]
+    call call('s:start', l:args)
   endif
 endfunction

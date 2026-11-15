@@ -4,8 +4,10 @@
 " file name there; in a paper that can be the revision and its marked-up diff.
 " Any other folder gets this file and -pdf: with no name latexmk builds every
 " .tex file in the folder, and without -pdf it writes a .dvi. latexmk reads
-" latexmkrc from where it runs, which is Vim's current directory, so that is
-" where this looks.
+" latexmkrc from where it runs, which is Vim's current directory. The vimrc
+" has that follow the buffer, but only once the buffer is entered: when this
+" is read, as the file opens, it is still the directory of the last buffer.
+" So this looks in the folder of the file itself.
 "
 " -interaction=nonstopmode so that an error ends the run instead of waiting at
 " TeX's prompt, and -file-line-error so that TeX reports file:line: message.
@@ -29,7 +31,7 @@ set cpo&vim
 
 " Quoted by hand with forward slashes, not through %:S: see compiler/matlab.vim.
 let s:makeprg = 'latexmk -interaction=nonstopmode -file-line-error'
-if !filereadable('latexmkrc') && !filereadable('.latexmkrc')
+if !filereadable(expand('%:p:h') . '/latexmkrc') && !filereadable(expand('%:p:h') . '/.latexmkrc')
   let s:makeprg .= ' -pdf "%:gs?\\?/?"'
 endif
 execute 'CompilerSet makeprg=' . escape(s:makeprg, ' \|"')

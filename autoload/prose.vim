@@ -407,8 +407,9 @@ function! s:Start(buf, language, shown) abort
   call s:Reset(a:buf)
   augroup prose_buffers
     execute 'autocmd! * <buffer=' . a:buf . '>'
-    " Reloaded (:edit!, or changed on disk): the text is new, the listener
-    " was told nothing.
+    " Read again because it changed on disk: the text is new, the listener
+    " was told nothing. (:edit! unloads the buffer first, which drops it
+    " here, and it is marked anew like any buffer that is opened.)
     execute 'autocmd BufReadPost <buffer=' . a:buf . '> call s:Reload(' . a:buf . ')'
     execute 'autocmd BufUnload <buffer=' . a:buf . '> call s:Drop(' . a:buf . ')'
   augroup END

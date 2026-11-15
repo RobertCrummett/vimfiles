@@ -31,7 +31,7 @@ a build does no harm.
 
 A |:make| during a build does not stop it, because killing a build can leave
 half-written files behind. One more build follows the running one, however
-many times |:make| was given.
+many times |:make| was given: that of the buffer it was last given in.
 
                                                             *bgmake#running()*
 bgmake#running()        True while a build runs, for 'statusline'.
