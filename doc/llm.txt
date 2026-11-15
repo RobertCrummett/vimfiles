@@ -132,7 +132,8 @@ by default, and `ErrorMsg` for errors.
 
 Ghost text uses the highlight group `LlmGhost`, which links to
 `ComplMatchIns`, the group Vim uses for text that completion inserted, so
-the two look the same. The custom colorscheme makes both light blue.
+the two look the same (to `Comment` in a Vim without that group). The
+custom colorscheme makes both light blue.
 
 ==============================================================================
 5. The server                                                    *llm-server*
@@ -145,7 +146,7 @@ UI.
 
 Which GPU ~                                                    *llm-device*
 A CPU with its own graphics next to a discrete card shows up to the server
-as two devices (`:LlmDevices` lists them), and its default is then to split
+as two devices (|:LlmDevices| lists them), and its default is then to split
 the model across both. So when there is more than one, the model is pinned
 to a single device with `--device`: the one |g:llm_device| names, or by
 default the one that does not look integrated (names with "Radeon(TM)
@@ -360,14 +361,19 @@ Typst and English prose acceptably. Language-specific models are not worth
 their disk space for this use.
 
 Size is a memory decision. A model needs about its file size in VRAM plus
-roughly 1 GB for an 8k context. On the 6 GB laptop GPU the 3B model fits
-and is quick; the 7B spills into system memory and slows down. On a card
-with 12 GB or more, the 7B is a clear step up in block quality. The 1.5B
-model is the one to use when latency matters more than quality: it
-generates about twice as fast as the 3B.
+roughly 1 GB for an 8k context, out of what the card has free, which is
+less than it advertises. On the 6 GB laptop GPU the 3B model fits and is
+quick; the 7B fits only at Q4 (qwen2.5-coder-7b-q4), with little to spare
+and at about twice the wait, and at Q8 it does not load at all. On a card
+with 12 GB or more, the 7B at Q4 is a step up on code, and the 14B at Q4
+knows more of the subject matter. The 1.5B model is the one to use when
+latency matters more than quality: it generates about twice as fast as the
+3B. The measurements are in models/BENCHMARKS.md.
 
 For prose-heavy work, qwen3-4b is listed as a general model; it lacks
-fill-in-the-middle, so it only continues what is before the cursor.
+fill-in-the-middle, so it only continues what is before the cursor, and it
+did worse than the coder models even on prose. The Mistral rows of the
+registry have no fill-in-the-middle either and have not been measured.
 
 ==============================================================================
 10. Beside mathterm                                            *llm-mathterm*
