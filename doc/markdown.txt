@@ -32,15 +32,15 @@ and rows with fewer cells than the widest get empty ones. Widths are display
 widths, so CJK text lines up too. `\|` inside a cell is kept as it is.
 Nothing in a table is ever wrapped. >
 
-    | Name | Value | Note |          | Name  | Value |  Note   |
-    |---|--:|:-:|               ->    | ----- | ----: | :-----: |
-    |alpha|1|first|                   | alpha |     1 |  first  |
+    | Name | Value | Note |          | Name  | Value | Note  |
+    |---|--:|:-:|               ->    | ----- | ----: | :---: |
+    |alpha|1|first|                   | alpha |     1 | first |
 <
 `gqq` on any row formats the whole table, since the column widths belong to
 the whole table. Lines that are not part of a table are formatted by Vim's
 own gq as before, so `gqip` over prose and `gqG` over a whole file both do
 the right thing to each part. A line with a pipe in it but no separator row
-nearby is prose.
+nearby is prose, and so is a table in a blockquote, its rows behind a `>`.
 
 The ftplugin also takes `t` and `c` out of 'formatoptions', which the runtime
 puts back: nothing here wraps while you type.

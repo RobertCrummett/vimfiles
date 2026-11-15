@@ -22,7 +22,7 @@ endfunction
 " Cells of a row, trimmed, without the edge pipes.
 function! s:cells(line) abort
   let l:s = substitute(a:line, '^\s*|', '', '')
-  let l:s = substitute(l:s, '|\s*$', '', '')
+  let l:s = substitute(l:s, '\\\@<!|\s*$', '', '')
   return map(split(l:s, '\\\@<!|', 1), 'trim(v:val)')
 endfunction
 
@@ -59,19 +59,20 @@ function! markdown#format_table(first, last) abort
   let l:lines = getline(a:first, a:last)
   let l:indent = matchstr(l:lines[0], '^\s*')
   let l:rows = []
+  " Only the first line that looks like a separator row is one: a row of
+  " dashes further down, | - | - |, is data and keeps its text.
   let l:seps = {}
   for l:i in range(len(l:lines))
     call add(l:rows, s:cells(l:lines[l:i]))
-    if s:is_separator(l:lines[l:i])
+    if empty(l:seps) && s:is_separator(l:lines[l:i])
       let l:seps[l:i] = 1
     endif
   endfor
   let l:ncol = max(map(copy(l:rows), 'len(v:val)'))
-  " Alignment per column from the first separator row; left otherwise.
+  " Alignment per column from the separator row; left otherwise.
   let l:aligns = repeat(['l'], l:ncol)
-  for l:i in sort(map(keys(l:seps), 'str2nr(v:val)'), 'n')
+  for l:i in keys(l:seps)
     let l:aligns = map(range(l:ncol), 'v:val < len(l:rows[l:i]) ? s:align(l:rows[l:i][v:val]) : "l"')
-    break
   endfor
   " Column widths: the widest cell, and never less than the three
   " characters a separator cell needs.
@@ -155,7 +156,8 @@ function! markdown#format() abort
   endif
   " Bottom up, so a block changing its line count leaves the ones above
   " it where they were. Prose goes through Vim's own gq with this
-  " function out of the way.
+  " function out of the way, as a motion and under :keepjumps so that the
+  " Visual marks and the jump list are left as they were.
   let l:view = winsaveview()
   for [l:s, l:e, l:table] in reverse(l:blocks)
     if l:table
@@ -164,7 +166,7 @@ function! markdown#format() abort
       let l:save = &l:formatexpr
       setlocal formatexpr=
       try
-        execute 'silent normal! ' . l:s . 'GV' . l:e . 'Ggq'
+        execute 'silent keepjumps normal! ' . l:s . 'Ggq' . l:e . 'G'
       finally
         let &l:formatexpr = l:save
       endtry
