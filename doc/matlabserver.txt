@@ -100,18 +100,21 @@ The protocol is described at the top of matlab/vimserver.m: one request per
 line, tagged with an id that the reply carries back, so that replies can
 interleave when a run is stopped in the debugger. Vim sends one request at
 a time and reads the replies through a channel callback; |:Matlab| and
-|:make| wait on top of that, sleeping in small steps, which is when the
-callback runs.
+|:MatlabRun| wait on top of that, sleeping in small steps, which is when the
+callback runs. |:MatlabMake| does not wait: the callback finishes it.
 
 ==============================================================================
 3. :make and the quickfix list                             *matlabserver-make*
 
                                                               *:MatlabMake*
-:MatlabMake             Write the current buffer, run it in the session, and
-:MatlabMake!            put whatever it raised into the quickfix list, so
-                        |:clist|, |:cnext| and |:cc| walk it. Starts the
-                        session first if there is not one. With ! the cursor
-                        stays put, the way :make! differs from |:make|.
+:MatlabMake             Write the current buffer and run it in the session,
+:MatlabMake!            in the background, as every |:make| is here
+                        (|bgmake|): it returns at once, and when the run ends
+                        whatever it raised goes into the quickfix list, so
+                        |:clist|, |:cnext| and |:cc| walk it. Nothing jumps,
+                        with ! or without, because the cursor may be anywhere
+                        by then. Starts the session first if there is not
+                        one, and waits for that.
 
 Typing |:make| in a matlab buffer runs :MatlabMake. While the debugger is
 open, :MatlabMake and |:MatlabRun| both do what its |matlabdebug-:Run|
@@ -125,8 +128,15 @@ debugger's windows. >
 <
 Errors name the innermost frame first and each caller after, so :cnext walks
 out of the stack. A file that runs clean clears the quickfix list and shows
-whatever it printed instead. The first :make of a Vim session starts Matlab
-and takes about five seconds; every one after that is around 0.01 s.
+whatever it printed instead: two lines or fewer on the command line, more in
+the output window, which opens without taking the cursor. The first :make of
+a Vim session starts Matlab and takes about five seconds; every one after that
+is around 0.01 s.
+
+A run has no time limit. The session takes one request at a time, so a :make
+given during a run waits behind it, and |:MatlabStop| cuts off a run that does
+not end. A run that stops at a breakpoint is the debugger's until it ends, and
+then its errors reach the quickfix list.
 
 While it waits for a new session it tries the socket every 250 ms and
 counts up on the command line, "matlabserver: starting Matlab, 3 s ...",
@@ -161,10 +171,11 @@ Set |g:matlabserver_make_abbrev| to 0 to keep :make literal.
 
 A :make from a script or a mapping is not abbreviated: abbreviations apply to
 typed input only. Those fall to 'makeprg', which compiler/matlab.vim points at
-`matlab -batch`. That runs the file and needs no session, but pays Matlab's
-five second startup every time, and its errors are shown without reaching the
-quickfix list: matlab -batch reports "Error in helper (line 2)", a function
-and no file, which no 'errorformat' can place.
+`matlab -batch`, run in the background like any other |:make|. That runs the
+file and needs no session, but pays Matlab's five second startup every time,
+and its errors do not reach the quickfix list as entries: matlab -batch
+reports "Error in helper (line 2)", a function and no file, which no
+'errorformat' can place. |bgmake| lists the last lines of its output instead.
 
 Note for anyone editing compiler/matlab.vim: the paths there are quoted by
 hand with forward slashes rather than through |shellescape()| and `%:p:S`.
@@ -270,9 +281,10 @@ g:matlabserver_idle     Seconds of quiet before the session closes itself.
                         |matlabserver-idle|.
 
                                                     *g:matlabserver_timeout*
-g:matlabserver_timeout  How long to wait for a reply, in milliseconds.
-                        Default 60000. Raise it if you run something slow
-                        with |:MatlabRun|. The session carries on with what
+g:matlabserver_timeout  How long |:Matlab| and |:MatlabRun| wait for a reply,
+                        in milliseconds. Default 60000; |:MatlabMake| has no
+                        limit. Raise it if you run something slow with
+                        |:MatlabRun|. The session carries on with what
                         it was told to do, and the message says so; the
                         late reply is dropped when it comes.
 

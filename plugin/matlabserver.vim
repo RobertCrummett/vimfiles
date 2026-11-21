@@ -7,7 +7,8 @@
 "   :MatlabStatus         is it up, and how fast is the round trip
 "   :Matlab {command}     evaluate {command} in it
 "   :MatlabRun            write the current file and run it
-"   :MatlabMake[!]        run it and put errors in the quickfix list
+"   :MatlabMake[!]        run it in the background and put errors in the
+"                         quickfix list when it ends
 "
 " Typing :make in a matlab buffer runs :MatlabMake, so errors land in the
 " quickfix list for :clist and :cnext. It starts the session if there is not
@@ -21,7 +22,7 @@
 "
 " g:matlabserver_port    port to listen on (51763)
 " g:matlabserver_idle    seconds of quiet before the session closes itself (1800)
-" g:matlabserver_timeout how long to wait for a reply, ms (60000)
+" g:matlabserver_timeout how long :Matlab and :MatlabRun wait, ms (60000)
 " g:matlabserver_start_timeout  how long :MatlabMake waits for a session (30000)
 " g:matlabserver_make_abbrev    let typed :make mean :MatlabMake (1)
 " g:matlabdoc_program    which matlab.exe to run, shared with matlabdoc

@@ -454,7 +454,10 @@ endfunction
 
 " ------------------------------------------------------------- report
 
-function! s:show(title, res) abort
+" With a:1 set the cursor goes back to where it was: the end of a run in the
+" background must not take it from what is being typed.
+function! s:show(title, res, ...) abort
+  let l:back = a:0 && a:1 ? win_getid() : 0
   let l:win = 0
   for l:w in range(1, winnr('$'))
     if getbufvar(winbufnr(l:w), 'matlabserver_out', 0)
@@ -488,17 +491,24 @@ function! s:show(title, res) abort
   setlocal nomodified nomodifiable
   setlocal filetype=matlabout
   normal! gg
+  if l:back
+    call win_gotoid(l:back)
+  endif
 endfunction
 
-" Short and clean enough to just echo? Then do, and skip the window.
-function! matlabserver#report(title, res) abort
+" Short and clean enough to just echo? Then do, and skip the window. With a:1
+" set it is the end of a run in the background, as for finish_run().
+function! matlabserver#report(title, res, ...) abort
+  let l:background = a:0 && a:1
   let l:body = filter(copy(a:res.lines), '!empty(trim(v:val))')
   if a:res.ok && len(l:body) <= 2
-    redraw
+    if !l:background
+      redraw
+    endif
     echo empty(l:body) ? 'matlabserver: ok' : join(l:body, '  ')
     return
   endif
-  call s:show(a:title, a:res)
+  call s:show(a:title, a:res, l:background)
   if !a:res.ok
     call s:warn('the command raised; see the output window')
   endif
@@ -593,21 +603,27 @@ function! matlabserver#make(bang) abort
   let l:name = fnamemodify(l:file, ':t:r')
   redraw
   echo 'matlabserver: running ' . l:name . ' ...'
-  let l:res = matlabserver#eval_sync(matlabserver#run_command(l:file),
-    \ get(g:, 'matlabserver_timeout', 60000))
-  if l:res.status == 3
-    " A breakpoint. The debugger has the file now; the quickfix list gets
-    " whatever the run raises once it ends.
-    call matlabserver#on_done(l:res.id, {res -> matlabserver#finish_run(l:name, res, a:bang)})
-    return
-  endif
-  call matlabserver#finish_run(l:name, l:res, a:bang)
+  " In the background, as every :make is (plugin/bgmake.vim): this returns at
+  " once, and the reply goes to the callback when the run ends, also after a
+  " stop in the debugger, which has the file meanwhile. No time limit: the
+  " session takes one request at a time, and :MatlabStop cuts off a run that
+  " does not end.
+  call matlabserver#request('eval', matlabserver#run_command(l:file),
+    \ {res -> matlabserver#finish_run(l:name, res, a:bang, 1)})
 endfunction
 
 " Report the end of a run of {name}: output shown, errors into the quickfix
 " list. Shared by :MatlabMake and the debugger's :Run.
-function! matlabserver#finish_run(name, res, bang) abort
-  redraw
+"
+" With a:1 set it is the end of a run in the background, reached from a
+" callback while the cursor may be anywhere: nothing jumps, the output
+" window opens without taking the cursor, and there is no :redraw, which
+" from a callback loses typed keys in the Windows console.
+function! matlabserver#finish_run(name, res, bang, ...) abort
+  let l:background = a:0 && a:1
+  if !l:background
+    redraw
+  endif
   if a:res.status == 2
     echo 'matlabserver: ' . a:name . ' was abandoned'
     return
@@ -616,7 +632,7 @@ function! matlabserver#finish_run(name, res, bang) abort
     " Nothing raised, so there is nothing for the quickfix list; show whatever
     " the file printed instead.
     call setqflist([], 'r')
-    call matlabserver#report('Matlab make ' . a:name, a:res)
+    call matlabserver#report('Matlab make ' . a:name, a:res, l:background)
     return
   endif
   " :cgetexpr reads the global 'errorformat' and never the buffer's, so what
@@ -641,15 +657,17 @@ function! matlabserver#finish_run(name, res, bang) abort
   let l:list = getqflist()
   let l:n = len(filter(copy(l:list), 'v:val.valid'))
   if l:n == 0
-    call matlabserver#report('Matlab make ' . a:name, a:res)
+    call matlabserver#report('Matlab make ' . a:name, a:res, l:background)
     return
   endif
-  if !a:bang
+  if !a:bang && !l:background
     " Not :cfirst: entry 1 is whatever the file printed before it raised,
     " and :cfirst goes to that line of output and so nowhere.
     execute 'cc' indexof(l:list, 'v:val.valid') + 1
   endif
-  redraw
+  if !l:background
+    redraw
+  endif
   echo printf('matlabserver: %s raised, %d quickfix entr%s (:clist)',
     \ a:name, l:n, l:n == 1 ? 'y' : 'ies')
 endfunction
