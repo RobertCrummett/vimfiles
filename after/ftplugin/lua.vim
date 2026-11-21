@@ -4,6 +4,9 @@
 " :make runs the file with Lua. See compiler/lua.vim.
 compiler lua
 
+setlocal shiftwidth=2
+setlocal softtabstop=-1
+
 " makeprg and errorformat are what "compiler lua" set; the runtime file's
 " undo command does not know about them.
 let b:undo_ftplugin = (empty(get(b:, 'undo_ftplugin', '')) ? '' : b:undo_ftplugin . ' | ')
