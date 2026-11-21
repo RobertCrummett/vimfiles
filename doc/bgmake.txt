@@ -2,7 +2,8 @@
 
                                                     *bgmake* *plugin-bgmake*
 Runs |:make| as a job, so that editing goes on while it builds, and fills the
-quickfix list when it ends. Lives in plugin/bgmake.vim and autoload/bgmake.vim.
+quickfix list when it ends. In every buffer, whatever its filetype. Lives in
+plugin/bgmake.vim and autoload/bgmake.vim.
 
 1. Use                                          |bgmake-use|
 2. Errors                                       |bgmake-errors|
@@ -12,11 +13,11 @@ quickfix list when it ends. Lives in plugin/bgmake.vim and autoload/bgmake.vim.
 ==============================================================================
 1. Use                                                            *bgmake-use*
 
-In a buffer whose filetype is in |g:bgmake_filetypes|, |:make| writes the
-buffer if it is modified, returns at once, and runs 'makeprg' as a job, in the
-current directory and through 'shell', as |:make| itself does. Every |:make|
-goes this way, typed or from a mapping or a script. In any other buffer |:make|
-is the ordinary one.
+|:make| writes the buffer if it is a modified file, returns at once, and runs
+'makeprg' as a job, in the current directory and through 'shell', as |:make|
+itself does. Arguments go in place of $* in 'makeprg', or after it, so `:make
+clean` cleans. Every |:make| goes this way, typed or from a mapping or a
+script. |:lmake| is the ordinary one.
 
 When the build ends the last line says how it went: >
 
@@ -27,11 +28,20 @@ When the build ends the last line says how it went: >
 Nothing jumps and no window opens, because the cursor may be anywhere by then.
 The errors are read with the 'errorformat' of the buffer that started the
 build, and from the directory it ran in, so changing buffer or directory during
-a build does no harm.
+a build does no harm. |QuickFixCmdPost| fires then, as after |:make|, with that
+buffer as the current one even when no window shows it: Lean's plugin puts its
+columns right there (|lean-make|).
+
+Only a file is written first. A buffer with no name still builds, and a
+listing (|diredit|) or a terminal is never written, since writing one means
+something else.
 
 A |:make| during a build does not stop it, because killing a build can leave
-half-written files behind. One more build follows the running one, however
-many times |:make| was given: that of the buffer it was last given in.
+half-written files behind. The last |:make| given during it follows once it
+ends, in its own buffer and directory, however many were given.
+
+In a matlab buffer a typed |:make| is |:MatlabMake|, which runs the file in
+the Matlab session and comes back at once as well (|matlabserver-make|).
 
                                                             *bgmake#running()*
 bgmake#running()        True while a build runs, for 'statusline'.
@@ -70,8 +80,10 @@ Warnings are not listed: an undefined citation is not an error to latexmk.
 3. Options                                                    *bgmake-options*
 
 *g:bgmake_filetypes*    The filetypes whose |:make| runs in the background.
-                        Default ['tex']. An empty list keeps every |:make|
-                        ordinary. Set it in the vimrc, or at any time.
+                        Default ['*'], every buffer, with a filetype or
+                        without. ['tex'] keeps it to LaTeX, and an empty
+                        list keeps every |:make| ordinary. Set it in the
+                        vimrc, or at any time.
 
 ==============================================================================
 4. Limits                                                      *bgmake-limits*
@@ -80,8 +92,15 @@ Warnings are not listed: an undefined citation is not an error to latexmk.
 works like CTRL-C. So:
 
 - What follows the |:make| is dropped: the rest of "make | cwindow", the rest
-  of a function, and keys still queued in a mapping.
-- The autocommand cannot see arguments or the !, so ":make foo" builds as
-  |:make| does.
+  of a function, and keys still queued in a mapping. A script that reads the
+  quickfix list after its :make would find it as it was.
+- The autocommand cannot see the arguments. They are read from the command
+  line that was typed for the |:make|, or that a mapping typed with ":". A
+  :make from a script or a <Cmd> mapping builds without them.
+- The ! makes no difference: nothing jumps either way.
+
+With cmd.exe for 'shell', the shell is given the line |:make| would give it,
+the ( and ) of 'shellxquote' around the command, so a 'makeprg' that quotes a
+file name works as with bash. The build's input is closed at once.
 
  vim:tw=78:ts=8:noet:ft=help:norl:

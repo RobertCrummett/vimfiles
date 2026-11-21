@@ -1,33 +1,75 @@
 " The build behind plugin/bgmake.vim.
 "
-" A :make during a build does not stop it. Killing latexmk can leave a
-" half-written PDF or .aux behind, so one more build follows instead.
+" A :make during a build does not stop it. Killing a build can leave a
+" half-written PDF, .aux or object file behind, so the :make asked for
+" during it follows it instead, in its own buffer and directory.
 
 let s:build = {}      " the running build, or empty
-let s:again = []      " a :make came during it: what s:start() takes for it
+let s:next = {}       " the last :make asked for during it, or empty
+let s:cmdline = ''    " the command line last typed, until a :make takes it
 
 " 'statusline' can show this.
 function! bgmake#running() abort
   return !empty(s:build)
 endfunction
 
-function! bgmake#make(timer) abort
-  if empty(bufname('%'))
-    call s:warn('this buffer has no file to make')
+function! bgmake#wanted() abort
+  return index(g:bgmake_filetypes, '*') >= 0 || index(g:bgmake_filetypes, &filetype) >= 0
+endfunction
+
+" CmdlineLeave on a : line. What was typed, for bgmake#args(), unless it was
+" abandoned: v:char is the key that left the line, and some Vims also say so
+" in v:event.
+function! bgmake#typed() abort
+  let l:abandoned = get(v:event, 'abort', 0) || v:char ==# "\<Esc>" || v:char ==# "\<C-C>"
+  let s:cmdline = l:abandoned ? '' : getcmdline()
+endfunction
+
+" The arguments of the :make that is starting, from the command line typed
+" for it: after modifiers such as :silent, "make", and a !, up to a bar that
+" is not escaped, as for :make itself. A :make from a script or a <Cmd>
+" mapping leaves no command line, and has none. The line is taken once, so
+" that one typed earlier is never used for a later :make.
+function! bgmake#args() abort
+  let l:line = s:cmdline
+  let s:cmdline = ''
+  let l:m = matchlist(l:line, '^[: \t]*\%(\h\w*!\=\s\+\)*mak\%[e]!\=\%(\s\+\(\%([^|\\]\|\\.\)*\)\)\=\s*\%(|\|$\)')
+  return empty(l:m) ? '' : substitute(trim(l:m[1]), '\\|', '|', 'g')
+endfunction
+
+" The command :make would run: the arguments in place of every $* in
+" 'makeprg', or after it, and then % and the like expanded.
+function! s:command(args) abort
+  let l:prg = &makeprg
+  if l:prg =~# '\$\*'
+    let l:prg = substitute(l:prg, '\$\*', escape(a:args, '\&'), 'g')
+  elseif !empty(a:args)
+    let l:prg .= ' ' . a:args
+  endif
+  return expandcmd(l:prg)
+endfunction
+
+function! bgmake#make(args, timer) abort
+  " :make on a stale file is a trap, as in matlabserver#make(). Only a buffer
+  " that is a file is written: writing a listing or a terminal means
+  " something else, or nothing, and a buffer with no name still builds.
+  try
+    if &modified && &buftype ==# '' && !empty(bufname('%'))
+      silent update
+    endif
+    let l:request = {'cmd': s:command(a:args), 'efm': &errorformat, 'dir': getcwd(),
+      \ 'buffer': bufnr('%')}
+  catch
+    " E499 for a % in 'makeprg' in a buffer with no name, or a write that failed.
+    call s:warn(substitute(v:exception, '^Vim\%((\a\+)\)\=:', '', ''))
     return
-  endif
-  " :make on a stale file is a trap, as in matlabserver#make().
-  if &modified
-    silent update
-  endif
-  let l:args = [expandcmd(&makeprg), &errorformat, getcwd(), bufnr('%')]
+  endtry
   if !empty(s:build)
-    " Of this buffer, which need not be the one that is being built.
-    let s:again = l:args
+    let s:next = l:request
     echo 'make: one more build after this one'
     return
   endif
-  call call('s:start', l:args)
+  call s:start(l:request)
   if !empty(s:build)
     echo 'make: building'
   endif
@@ -37,19 +79,33 @@ function! s:warn(message) abort
   echohl ErrorMsg | echomsg 'bgmake: ' . a:message | echohl None
 endfunction
 
-function! s:start(cmd, efm, dir, buffer) abort
-  let l:build = {'cmd': a:cmd, 'efm': a:efm, 'dir': a:dir, 'buffer': a:buffer,
-    \ 'lines': [], 'closed': 0, 'exited': 0, 'status': 0, 'started': reltime()}
-  " The shell runs it, as for :make itself. 'shell' may carry its own quotes.
-  let l:argv = [substitute(&shell, '^"\|"$', '', 'g'), &shellcmdflag, a:cmd]
-  let l:build.job = job_start(l:argv, {'cwd': a:dir, 'in_io': 'null', 'err_io': 'out',
+" What the shell is given to run a:cmd. With cmd.exe ('shellxquote' is ( or
+" "() it is the line :make builds, ( and ) around the command and nothing
+" escaped: given a list instead, Vim quotes each argument for C programs, and
+" Lean was handed "t.lean", quotes and all. Any other shell takes the command
+" as one argument, as before; 'shell' may carry its own quotes.
+function! s:shell(cmd) abort
+  let l:cmd = &shellquote . a:cmd . &shellquote
+  if has('win32') && &shellxquote =~# '^"\=($'
+    return &shell . ' ' . &shellcmdflag . ' ' . &shellxquote . l:cmd . (&shellxquote ==# '(' ? ')' : ')"')
+  endif
+  return [substitute(&shell, '^"\|"$', '', 'g'), &shellcmdflag, l:cmd]
+endfunction
+
+function! s:start(request) abort
+  let l:build = extend({'lines': [], 'closed': 0, 'exited': 0, 'status': 0, 'started': reltime()}, a:request)
+  " Its input is a pipe closed at once, an end of input like :make's. A null
+  " device is not: Lake, given one, fails as it starts Lean ("LEAN ASSERTION
+  " VIOLATION" in process.cpp).
+  let l:build.job = job_start(s:shell(l:build.cmd), {'cwd': l:build.dir, 'err_io': 'out',
     \ 'out_cb': function('s:output', [l:build]),
     \ 'close_cb': function('s:closed', [l:build]),
     \ 'exit_cb': function('s:exited', [l:build])})
   if job_status(l:build.job) ==# 'fail'
-    call s:warn('could not start ' . l:argv[0])
+    call s:warn('could not start ' . &shell)
     return
   endif
+  call ch_close_in(l:build.job)
   let s:build = l:build
 endfunction
 
@@ -80,6 +136,32 @@ function! s:entry(build, item) abort
   endif
   let a:item.valid = 1
   return a:item
+endfunction
+
+" :make fires QuickFixCmdPost once the list is filled, and what listens may
+" fix it up there: Lean's columns, for one. It runs with the buffer that was
+" built as the current one, as for :make, in a window that shows it, or in a
+" hidden popup when none does. A handler that fails costs nothing but itself.
+function! s:post(buffer) abort
+  if !exists('#QuickFixCmdPost#make') || !bufexists(a:buffer)
+    return
+  endif
+  let l:wins = win_findbuf(a:buffer)
+  let l:popup = 0
+  try
+    if empty(l:wins)
+      call bufload(a:buffer)
+      let l:popup = popup_create(a:buffer, {'hidden': 1})
+      let l:wins = [l:popup]
+    endif
+    call win_execute(l:wins[0], 'doautocmd <nomodeline> QuickFixCmdPost make')
+  catch
+    call s:warn('QuickFixCmdPost: ' . substitute(v:exception, '^Vim\%((\a\+)\)\=:', '', ''))
+  finally
+    if l:popup
+      call popup_close(l:popup)
+    endif
+  endtry
 endfunction
 
 function! s:finish(build) abort
@@ -114,8 +196,10 @@ function! s:finish(build) abort
     echo 'make done (' . l:took . ')'
   endif
   call setqflist([], ' ', {'title': a:build.cmd, 'items': l:items})
-  if !empty(s:again)
-    let [l:args, s:again] = [s:again, []]
-    call call('s:start', l:args)
+  call s:post(a:build.buffer)
+  if !empty(s:next)
+    let l:next = s:next
+    let s:next = {}
+    call s:start(l:next)
   endif
 endfunction
