@@ -539,6 +539,7 @@ Gassmann
 Gauckler
 GBq
 GCP
+GCV
 gelegnite
 geoacoustic
 geobarometry
@@ -630,6 +631,7 @@ Hardgrounds
 HCS
 HDR
 headwave
+Heagy
 Heidinger
 Heiskanen
 heli
@@ -638,6 +640,7 @@ helicoptermounted
 heliportable
 Hematitic
 hematitic
+Hermitian
 heterogeneit
 Hevelius
 hexogene
@@ -684,6 +687,7 @@ hydrogeological
 Hydrosein
 hypen
 hyperbolicity
+hyperparameter
 hyperparameters
 Hyperspectral
 hyperspectral
@@ -792,6 +796,7 @@ LaCoste
 LaCosteRomberg
 lacustrine
 lamprophyllite
+Laplace
 Laplacian
 Larmor
 Laterolog
@@ -947,6 +952,8 @@ monocline
 Monoenergetic
 monoenergetic
 monofrequency
+monopole
+monopoles
 monosulfidic
 Monosulfidic
 montmorillonite
@@ -995,6 +1002,7 @@ MWD
 MWP
 mylonites
 Nahcolite
+nanotesla
 nappe
 nappes
 narrowazimuth
@@ -1050,6 +1058,7 @@ northsouth
 NPP
 NRM
 Nrr
+nT
 NTP
 nuclides
 nulling
@@ -1318,6 +1327,7 @@ schists
 Schladming
 Schlumberger
 Schriever
+Schwarz
 schwertmannite
 scintillator
 scintillometer
@@ -1677,6 +1687,7 @@ wavefiled
 wavefront
 wavelengthdependent
 wavenumber
+wavenumbers
 waveshape
 wavetest
 wavetrain
@@ -1697,6 +1708,7 @@ Whiteside
 whitespace
 WHP
 wideazimuth
+Wiener
 wipeout
 WMO
 Worden
