@@ -285,6 +285,23 @@ function! s:Accents() abort
   hi! link leangoalError          customPink
   hi! link leangoalWarning        Normal
 
+  " Lua (groups beyond upstream's come from after/syntax/lua.vim), in Rust's
+  " colours. Calls are lavender, and with them the name a function statement
+  " defines and the library's functions, print and string.format; upstream
+  " leaves those on Identifier, which quiet leaves plain, and colours the
+  " keywords function and end like a name instead. The library's values,
+  " self, _G and math.pi, stay plain. Text literals are light pink, long [[ ]]
+  " strings and their brackets included. Escapes, nil, true and false and the
+  " <const> and <close> of Lua 5.4 are notation, light purple. goto and its
+  " label, and the ::label:: it jumps to, are hot pink. The other keywords,
+  " numbers and operators stay plain; metamethod names such as __index are
+  " lavender, as upstream has them.
+  hi! link luaFunc       customLavendar
+  hi! link luaFunction   Statement
+  hi! link luaString     customLightPink
+  hi! link luaString2    customLightPink
+  hi! link luaConstant   customLightPurple
+  hi! link luaAttribute  customLightPurple
   " Lisp
   hi! link lispFunc customLavendar
   hi! link lispKey  customLightPurple
