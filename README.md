@@ -65,6 +65,13 @@ Because I always come back to this editor, I might as well study the language of
   Lean's messages for the line, asked of Lean's language server (`lake
   serve` or `lean --server`, run as a job) as you move and type, saved or
   not. See `:help lean-local`.
+- **compiler/lua.vim**, **after/ftplugin/lua.vim**, **after/syntax/lua.vim** —
+  Lua. `:make` runs the file with `lua`, in the background like every
+  `:make`: the error and each frame of its traceback land in the quickfix
+  list, and what the program prints stays there as plain lines (`:copen`).
+  Calls, the functions a file defines and the library's are lavender;
+  strings light pink; escapes, `nil`, `true`, `false` and `<const>` light
+  purple; `goto` and labels hot pink.
 - **after/ftplugin/markdown.vim**, **after/syntax/markdown.vim**,
   **autoload/markdown.vim** — `$...$` and `$$...$$` are math, so the `_` in
   `$F_a$` is no longer an error and is coloured like Typst math; `gq` over a
